@@ -62,6 +62,7 @@ export default function PenjualanPage() {
 
   const [fhList, setFhList] = useState<MasterItem[]>([]);
   const [packageList, setPackageList] = useState<MasterItem[]>([]);
+  const [durationList, setDurationList] = useState<MasterItem[]>([]);
 
   const [form, setForm] = useState(emptyForm);
 
@@ -199,6 +200,24 @@ export default function PenjualanPage() {
   }
 
   // =========================
+  // AMBIL DURASI
+  // =========================
+
+  async function getDurations() {
+    const { data, error } = await supabase
+      .from("duration_list")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (error) {
+      alert("Gagal mengambil daftar durasi: " + error.message);
+      return;
+    }
+
+    setDurationList((data || []) as MasterItem[]);
+  }
+
+  // =========================
   // LOAD DATA
   // =========================
 
@@ -210,6 +229,7 @@ export default function PenjualanPage() {
       getProducts(),
       getFH(),
       getPackages(),
+      getDurations(),
     ]);
 
     setLoading(false);
@@ -305,6 +325,50 @@ export default function PenjualanPage() {
   }
 
   // =========================
+  // TAMBAH DURASI
+  // =========================
+
+  async function addDuration() {
+    const name = prompt("Masukkan durasi baru:");
+
+    if (!name || !name.trim()) return;
+
+    const cleanName = name.trim();
+
+    const { data, error } = await supabase
+      .from("duration_list")
+      .insert([{ name: cleanName }])
+      .select("id, name")
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        alert("Durasi tersebut sudah ada.");
+      } else {
+        alert(
+          "Gagal menambahkan durasi: " +
+            error.message
+        );
+      }
+
+      return;
+    }
+
+    if (data) {
+      setDurationList((current) =>
+        [...current, data].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
+
+      setForm((current) => ({
+        ...current,
+        duration: data.name,
+      }));
+    }
+  }
+
+  // =========================
   // FILTER
   // =========================
 
@@ -323,6 +387,9 @@ export default function PenjualanPage() {
           ?.toLowerCase()
           .includes(keyword) ||
         sale.package_name
+          ?.toLowerCase()
+          .includes(keyword) ||
+        sale.duration
           ?.toLowerCase()
           .includes(keyword);
 
@@ -628,6 +695,11 @@ export default function PenjualanPage() {
       return;
     }
 
+    if (!form.duration) {
+      alert("Pilih durasi terlebih dahulu.");
+      return;
+    }
+
     if (
       form.purchase_price === "" ||
       form.selling_price === ""
@@ -686,7 +758,7 @@ export default function PenjualanPage() {
         form.package_name,
 
       duration:
-        form.duration.trim(),
+        form.duration,
 
       quantity,
 
@@ -888,7 +960,7 @@ export default function PenjualanPage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <input
             type="text"
-            placeholder="Cari buyer, aplikasi, FH, atau paket..."
+            placeholder="Cari buyer, aplikasi, FH, paket..."
             value={search}
             onChange={(e) =>
               setSearch(e.target.value)
@@ -951,9 +1023,7 @@ export default function PenjualanPage() {
             <input
               type="date"
               value={endDate}
-              min={
-                startDate || undefined
-              }
+              min={startDate || undefined}
               onChange={(e) =>
                 setEndDate(e.target.value)
               }
@@ -1008,7 +1078,7 @@ export default function PenjualanPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-sm">
+            <table className="w-full min-w-[1250px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
                   <th className="px-6 py-4 text-xs text-gray-400">
@@ -1029,6 +1099,10 @@ export default function PenjualanPage() {
 
                   <th className="px-4 py-4 text-xs text-gray-400">
                     Paket
+                  </th>
+
+                  <th className="px-4 py-4 text-xs text-gray-400">
+                    Durasi
                   </th>
 
                   <th className="px-4 py-4 text-xs text-gray-400">
@@ -1094,14 +1168,12 @@ export default function PenjualanPage() {
                         {sale.fh || "-"}
                       </td>
 
-                      <td className="px-4 py-4">
-                        <p className="text-gray-600">
-                          {sale.package_name}
-                        </p>
+                      <td className="px-4 py-4 text-gray-600">
+                        {sale.package_name || "-"}
+                      </td>
 
-                        <p className="text-[10px] text-gray-400">
-                          {sale.duration}
-                        </p>
+                      <td className="px-4 py-4 text-gray-600">
+                        {sale.duration || "-"}
                       </td>
 
                       <td className="px-4 py-4 text-gray-600">
@@ -1144,6 +1216,9 @@ export default function PenjualanPage() {
                               : sale.order_status ===
                                 "On Going"
                               ? "bg-blue-50 text-blue-500"
+                              : sale.order_status ===
+                                "Refunded"
+                              ? "bg-gray-100 text-gray-500"
                               : "bg-yellow-50 text-yellow-600"
                           }`}
                         >
@@ -1225,9 +1300,7 @@ export default function PenjualanPage() {
 
                   <input
                     type="date"
-                    value={
-                      form.order_date
-                    }
+                    value={form.order_date}
                     onChange={(e) =>
                       setForm({
                         ...form,
@@ -1247,9 +1320,7 @@ export default function PenjualanPage() {
 
                   <input
                     type="text"
-                    value={
-                      form.buyer_name
-                    }
+                    value={form.buyer_name}
                     onChange={(e) =>
                       setForm({
                         ...form,
@@ -1273,9 +1344,7 @@ export default function PenjualanPage() {
                   </label>
 
                   <select
-                    value={
-                      form.app_name
-                    }
+                    value={form.app_name}
                     onChange={(e) =>
                       handleProductChange(
                         e.target.value
@@ -1411,26 +1480,54 @@ export default function PenjualanPage() {
                   </p>
                 </div>
 
+                {/* DURASI DROPDOWN */}
+
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
                     Durasi
                   </label>
 
-                  <input
-                    type="text"
-                    value={
-                      form.duration
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        duration:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="contoh: 1 Bulan"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={form.duration}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          duration:
+                            e.target.value,
+                        })
+                      }
+                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
+                      required
+                    >
+                      <option value="">
+                        Pilih durasi
+                      </option>
+
+                      {durationList.map(
+                        (item) => (
+                          <option
+                            key={item.id}
+                            value={item.name}
+                          >
+                            {item.name}
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={addDuration}
+                      className="rounded-xl bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-500 hover:bg-pink-100"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    Durasi baru bisa ditambahkan lewat tombol +
+                  </p>
                 </div>
               </div>
 
@@ -1444,9 +1541,7 @@ export default function PenjualanPage() {
                 <input
                   type="number"
                   min="1"
-                  value={
-                    form.quantity
-                  }
+                  value={form.quantity}
                   onChange={(e) =>
                     setForm({
                       ...form,
