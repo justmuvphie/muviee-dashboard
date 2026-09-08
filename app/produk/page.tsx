@@ -7,12 +7,16 @@ type Product = {
   id: number;
   name: string;
   category: string;
+  purchase_price: number;
+  selling_price: number;
   created_at?: string;
 };
 
 const emptyForm = {
   name: "",
   category: "Streaming",
+  purchase_price: "",
+  selling_price: "",
 };
 
 export default function ProdukPage() {
@@ -30,7 +34,9 @@ export default function ProdukPage() {
   async function getProducts() {
     const { data, error } = await supabase
       .from("products")
-      .select("id, name, category, created_at")
+      .select(
+        "id, name, category, purchase_price, selling_price, created_at"
+      )
       .order("id", { ascending: true });
 
     if (error) {
@@ -72,6 +78,8 @@ export default function ProdukPage() {
     setForm({
       name: product.name || "",
       category: product.category || "Streaming",
+      purchase_price: String(product.purchase_price ?? 0),
+      selling_price: String(product.selling_price ?? 0),
     });
 
     setShowForm(true);
@@ -91,11 +99,26 @@ export default function ProdukPage() {
       return;
     }
 
+    const purchasePrice = Number(form.purchase_price);
+    const sellingPrice = Number(form.selling_price);
+
+    if (isNaN(purchasePrice) || purchasePrice < 0) {
+      alert("Harga modal tidak valid.");
+      return;
+    }
+
+    if (isNaN(sellingPrice) || sellingPrice < 0) {
+      alert("Harga jual tidak valid.");
+      return;
+    }
+
     setSaving(true);
 
     const productData = {
       name: form.name.trim(),
       category: form.category,
+      purchase_price: purchasePrice,
+      selling_price: sellingPrice,
     };
 
     let error;
@@ -150,6 +173,14 @@ export default function ProdukPage() {
 
     alert("Produk berhasil dihapus.");
     await getProducts();
+  }
+
+  function formatRupiah(value: number) {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(value || 0);
   }
 
   if (loading) {
@@ -280,6 +311,44 @@ export default function ProdukPage() {
                   {product.category}
                 </span>
 
+                {/* HARGA */}
+                <div className="mt-4 space-y-2 rounded-xl bg-gray-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-gray-400">
+                      Harga Modal
+                    </span>
+
+                    <span className="text-xs font-semibold text-gray-700">
+                      {formatRupiah(product.purchase_price)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-gray-400">
+                      Harga Jual
+                    </span>
+
+                    <span className="text-xs font-semibold text-pink-500">
+                      {formatRupiah(product.selling_price)}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs text-gray-400">
+                        Profit Default
+                      </span>
+
+                      <span className="text-xs font-semibold text-green-500">
+                        {formatRupiah(
+                          product.selling_price -
+                            product.purchase_price
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="mt-5 flex gap-2">
                   <button
                     onClick={() => openEditForm(product)}
@@ -314,7 +383,7 @@ export default function ProdukPage() {
                 </h2>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  Masukkan informasi aplikasi.
+                  Masukkan informasi aplikasi dan harga default.
                 </p>
               </div>
 
@@ -327,6 +396,7 @@ export default function ProdukPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5 p-6">
+              {/* NAMA */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Nama Produk
@@ -347,6 +417,7 @@ export default function ProdukPage() {
                 />
               </div>
 
+              {/* KATEGORI */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Kategori
@@ -372,6 +443,79 @@ export default function ProdukPage() {
                 </select>
               </div>
 
+              {/* HARGA MODAL */}
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-600">
+                  Harga Modal / Firsthand
+                </label>
+
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    Rp
+                  </span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.purchase_price}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        purchase_price: e.target.value,
+                      })
+                    }
+                    placeholder="0"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* HARGA JUAL */}
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-600">
+                  Harga Jual Default
+                </label>
+
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    Rp
+                  </span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.selling_price}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        selling_price: e.target.value,
+                      })
+                    }
+                    placeholder="0"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* PREVIEW PROFIT */}
+              <div className="rounded-xl bg-pink-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    Profit Default
+                  </span>
+
+                  <span className="font-semibold text-pink-500">
+                    {formatRupiah(
+                      Number(form.selling_price || 0) -
+                        Number(form.purchase_price || 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* BUTTON */}
               <div className="flex gap-3">
                 <button
                   type="button"
