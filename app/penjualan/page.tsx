@@ -66,6 +66,9 @@ export default function PenjualanPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // =========================
+  // GET SALES
+  // =========================
   async function getSales() {
     const { data, error } = await supabase
       .from("sales")
@@ -82,6 +85,9 @@ export default function PenjualanPage() {
     setSales((data || []) as Sale[]);
   }
 
+  // =========================
+  // GET PRODUCTS
+  // =========================
   async function getProducts() {
     const { data, error } = await supabase
       .from("products")
@@ -95,9 +101,34 @@ export default function PenjualanPage() {
       return;
     }
 
-    setProducts((data || []) as Product[]);
+    /*
+      Hilangkan produk yang namanya sama.
+
+      Contoh database:
+      Netflix
+      Netflix
+      iQIYI
+      iQIYI
+
+      Akan menjadi:
+      Netflix
+      iQIYI
+    */
+    const uniqueProducts = Array.from(
+      new Map(
+        (data || []).map((product) => [
+          product.name.trim().toLowerCase(),
+          product,
+        ])
+      ).values()
+    );
+
+    setProducts(uniqueProducts as Product[]);
   }
 
+  // =========================
+  // LOAD DATA
+  // =========================
   async function loadData() {
     setLoading(true);
 
@@ -113,6 +144,9 @@ export default function PenjualanPage() {
     loadData();
   }, []);
 
+  // =========================
+  // FILTER SALES
+  // =========================
   const filteredSales = useMemo(() => {
     return sales.filter((sale) => {
       const keyword = search.toLowerCase();
@@ -147,6 +181,9 @@ export default function PenjualanPage() {
     endDate,
   ]);
 
+  // =========================
+  // SUMMARY
+  // =========================
   const totalOmzet = filteredSales.reduce(
     (total, sale) =>
       total +
@@ -161,6 +198,9 @@ export default function PenjualanPage() {
     0
   );
 
+  // =========================
+  // EXPORT CSV
+  // =========================
   function exportCSV() {
     if (filteredSales.length === 0) {
       alert("Tidak ada data yang bisa diexport.");
@@ -239,6 +279,9 @@ export default function PenjualanPage() {
     URL.revokeObjectURL(url);
   }
 
+  // =========================
+  // RESET FILTER
+  // =========================
   function resetFilters() {
     setSearch("");
     setStatusFilter("All");
@@ -246,6 +289,9 @@ export default function PenjualanPage() {
     setEndDate("");
   }
 
+  // =========================
+  // OPEN ADD FORM
+  // =========================
   function openAddForm() {
     setEditingId(null);
 
@@ -259,6 +305,9 @@ export default function PenjualanPage() {
     setShowForm(true);
   }
 
+  // =========================
+  // OPEN EDIT FORM
+  // =========================
   function openEditForm(sale: Sale) {
     setEditingId(sale.id);
 
@@ -268,27 +317,42 @@ export default function PenjualanPage() {
         new Date()
           .toISOString()
           .split("T")[0],
+
       buyer_name: sale.buyer_name || "",
+
       app_name: sale.app_name || "",
+
       package_name: sale.package_name || "",
+
       duration: sale.duration || "",
-      quantity: String(sale.quantity || 1),
+
+      quantity: String(
+        sale.quantity || 1
+      ),
+
       purchase_price: String(
         sale.purchase_price ?? ""
       ),
+
       selling_price: String(
         sale.selling_price ?? ""
       ),
+
       payment_method:
         sale.payment_method || "QRIS",
+
       order_status:
         sale.order_status || "Completed",
+
       notes: sale.notes || "",
     });
 
     setShowForm(true);
   }
 
+  // =========================
+  // CLOSE FORM
+  // =========================
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
@@ -301,16 +365,21 @@ export default function PenjualanPage() {
     });
   }
 
+  // =========================
+  // PRODUCT CHANGE
+  // =========================
   function handleProductChange(
     productName: string
   ) {
     const selectedProduct = products.find(
       (product) =>
-        product.name === productName
+        product.name.trim().toLowerCase() ===
+        productName.trim().toLowerCase()
     );
 
     setForm((currentForm) => ({
       ...currentForm,
+
       app_name: productName,
 
       purchase_price: selectedProduct
@@ -327,6 +396,9 @@ export default function PenjualanPage() {
     }));
   }
 
+  // =========================
+  // SUBMIT
+  // =========================
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
@@ -433,12 +505,16 @@ export default function PenjualanPage() {
       );
 
       closeForm();
+
       await getSales();
     }
 
     setSaving(false);
   }
 
+  // =========================
+  // DELETE SALE
+  // =========================
   async function deleteSale(sale: Sale) {
     const confirmed = confirm(
       `Hapus order ${sale.buyer_name} - ${sale.app_name}?`
@@ -486,9 +562,13 @@ export default function PenjualanPage() {
     }
 
     alert("Order berhasil dihapus.");
+
     await getSales();
   }
 
+  // =========================
+  // LOADING
+  // =========================
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
@@ -585,15 +665,19 @@ export default function PenjualanPage() {
             <option value="All">
               Semua Status
             </option>
+
             <option value="Completed">
               Completed
             </option>
+
             <option value="Pending">
               Pending
             </option>
+
             <option value="Cancelled">
               Cancelled
             </option>
+
             <option value="Refunded">
               Refunded
             </option>
@@ -1159,12 +1243,15 @@ export default function PenjualanPage() {
                     <option>
                       Completed
                     </option>
+
                     <option>
                       Pending
                     </option>
+
                     <option>
                       Cancelled
                     </option>
+
                     <option>
                       Refunded
                     </option>
