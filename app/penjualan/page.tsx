@@ -4,44 +4,44 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Sale = {
-  id: number;
+  id: string;
   order_date: string;
   buyer_name: string;
   app_name: string;
-  fh: string;
-  package_name: string;
-  duration: string;
+  fh: string | null;
+  package_name: string | null;
+  duration: string | null;
   quantity: number;
   purchase_price: number;
   selling_price: number;
   profit: number;
-  payment_method: string;
-  order_status: string;
-  notes: string;
+  payment_method: string | null;
+  order_status: string | null;
+  notes: string | null;
 };
 
 type Product = {
-  id: number;
+  id: string;
   name: string;
-  category: string;
+  category: string | null;
   purchase_price: number;
   selling_price: number;
 };
 
 type MasterItem = {
-  id: number;
+  id: string;
   name: string;
 };
 
 type MasterType = "fh" | "package" | "duration" | null;
 
-function formatRupiah(value: number) {
+const formatRupiah = (value: number) => {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(value || 0);
-}
+};
 
 const emptyForm = {
   order_date: new Date().toISOString().split("T")[0],
@@ -69,249 +69,114 @@ export default function PenjualanPage() {
   const [form, setForm] = useState(emptyForm);
 
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // =========================
-  // KELOLA MASTER DATA
-  // =========================
+  const [manageType, setManageType] = useState<MasterType>(null);
+  const [selectedMasterIds, setSelectedMasterIds] = useState<string[]>([]);
+  const [deletingMaster, setDeletingMaster] = useState(false);
 
-  const [manageType, setManageType] =
-    useState<MasterType>(null);
+  /* =========================
+     LOAD DATA
+  ========================= */
 
-  const [selectedMasterIds, setSelectedMasterIds] =
-    useState<number[]>([]);
-
-  const [deletingMaster, setDeletingMaster] =
-    useState(false);
-
-  function openManage(type: Exclude<MasterType, null>) {
-    setManageType(type);
-    setSelectedMasterIds([]);
-  }
-
-  function closeManage() {
-    setManageType(null);
-    setSelectedMasterIds([]);
-  }
-
-  function getMasterTitle() {
-    if (manageType === "fh") return "Kelola FH";
-    if (manageType === "package") return "Kelola Nama Paket";
-    if (manageType === "duration") return "Kelola Durasi";
-    return "";
-  }
-
-  function getMasterList() {
-    if (manageType === "fh") return fhList;
-    if (manageType === "package") return packageList;
-    if (manageType === "duration") return durationList;
-    return [];
-  }
-
-  function toggleMasterSelection(id: number) {
-    setSelectedMasterIds((current) =>
-      current.includes(id)
-        ? current.filter((itemId) => itemId !== id)
-        : [...current, id]
-    );
-  }
-
-  function selectAllMaster() {
-    const list = getMasterList();
-
-    if (
-      list.length > 0 &&
-      selectedMasterIds.length === list.length
-    ) {
-      setSelectedMasterIds([]);
-    } else {
-      setSelectedMasterIds(
-        list.map((item) => item.id)
-      );
-    }
-  }
-
-  // =========================
-  // AMBIL DATA PENJUALAN
-  // =========================
-
-  async function getSales() {
+  const getSales = async () => {
     const { data, error } = await supabase
       .from("sales")
       .select(
-        "id, order_date, buyer_name, app_name, fh, package_name, duration, quantity, purchase_price, selling_price, profit, payment_method, order_status, notes"
+        `
+        id,
+        order_date,
+        buyer_name,
+        app_name,
+        fh,
+        package_name,
+        duration,
+        quantity,
+        purchase_price,
+        selling_price,
+        profit,
+        payment_method,
+        order_status,
+        notes
+      `
       )
-      .order("id", { ascending: false });
+      .order("order_date", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
-      alert(
-        "Gagal mengambil data penjualan: " +
-          error.message
-      );
+      console.error(error);
+      alert("Gagal mengambil data penjualan.");
       return;
     }
 
-    setSales((data || []) as Sale[]);
-  }
+    setSales(data || []);
+  };
 
-  // =========================
-  // AMBIL DATA PRODUK
-  // =========================
-
-  async function getProducts() {
+  const getProducts = async () => {
     const { data, error } = await supabase
       .from("products")
-      .select(
-        "id, name, category, purchase_price, selling_price"
-      )
-      .order("id", { ascending: true });
+      .select("id, name, category, purchase_price, selling_price")
+      .order("name", { ascending: true });
 
     if (error) {
-      alert(
-        "Gagal mengambil data produk: " +
-          error.message
-      );
+      console.error(error);
       return;
     }
 
-    const productMap = new Map<string, Product>();
+    setProducts(data || []);
+  };
 
-    for (const item of data || []) {
-      const name = String(
-        item.name || ""
-      ).trim();
-
-      if (!name) continue;
-
-      const key = name.toLowerCase();
-
-      const purchasePrice = Number(
-        item.purchase_price ?? 0
-      );
-
-      const sellingPrice = Number(
-        item.selling_price ?? 0
-      );
-
-      const existing = productMap.get(key);
-
-      if (!existing) {
-        productMap.set(key, {
-          id: item.id,
-          name,
-          category: item.category || "",
-          purchase_price: purchasePrice,
-          selling_price: sellingPrice,
-        });
-
-        continue;
-      }
-
-      productMap.set(key, {
-        ...existing,
-        purchase_price:
-          purchasePrice > 0
-            ? purchasePrice
-            : existing.purchase_price,
-        selling_price:
-          sellingPrice > 0
-            ? sellingPrice
-            : existing.selling_price,
-      });
-    }
-
-    const finalProducts = Array.from(
-      productMap.values()
-    ).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-
-    setProducts(finalProducts);
-  }
-
-  // =========================
-  // AMBIL FH
-  // =========================
-
-  async function getFH() {
+  const getFH = async () => {
     const { data, error } = await supabase
       .from("fh_list")
       .select("id, name")
       .order("name", { ascending: true });
 
     if (error) {
-      alert(
-        "Gagal mengambil daftar FH: " +
-          error.message
-      );
+      console.error(error);
       return;
     }
 
-    setFhList(
-      (data || []) as MasterItem[]
-    );
-  }
+    setFhList(data || []);
+  };
 
-  // =========================
-  // AMBIL PAKET
-  // =========================
-
-  async function getPackages() {
+  const getPackages = async () => {
     const { data, error } = await supabase
       .from("package_list")
       .select("id, name")
       .order("name", { ascending: true });
 
     if (error) {
-      alert(
-        "Gagal mengambil daftar paket: " +
-          error.message
-      );
+      console.error(error);
       return;
     }
 
-    setPackageList(
-      (data || []) as MasterItem[]
-    );
-  }
+    setPackageList(data || []);
+  };
 
-  // =========================
-  // AMBIL DURASI
-  // =========================
-
-  async function getDurations() {
+  const getDurations = async () => {
     const { data, error } = await supabase
       .from("duration_list")
       .select("id, name")
       .order("name", { ascending: true });
 
     if (error) {
-      alert(
-        "Gagal mengambil daftar durasi: " +
-          error.message
-      );
+      console.error(error);
       return;
     }
 
-    setDurationList(
-      (data || []) as MasterItem[]
-    );
-  }
+    setDurationList(data || []);
+  };
 
-  // =========================
-  // LOAD DATA
-  // =========================
-
-  async function loadData() {
+  const loadData = async () => {
     setLoading(true);
 
     await Promise.all([
@@ -323,378 +188,294 @@ export default function PenjualanPage() {
     ]);
 
     setLoading(false);
-  }
+  };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  // =========================
-  // TAMBAH MASTER DATA
-  // =========================
+  /* =========================
+     MASTER MANAGEMENT
+  ========================= */
 
-  async function addMasterItem(
-    type: Exclude<MasterType, null>
-  ) {
-    let tableName = "";
-    let label = "";
+  const openManage = (type: MasterType) => {
+    setManageType(type);
+    setSelectedMasterIds([]);
+  };
 
-    if (type === "fh") {
-      tableName = "fh_list";
-      label = "nama FH";
-    }
+  const closeManage = () => {
+    setManageType(null);
+    setSelectedMasterIds([]);
+  };
 
-    if (type === "package") {
-      tableName = "package_list";
-      label = "nama paket";
-    }
+  const getMasterTitle = () => {
+    if (manageType === "fh") return "Kelola FH";
+    if (manageType === "package") return "Kelola Paket";
+    if (manageType === "duration") return "Kelola Durasi";
+    return "";
+  };
 
-    if (type === "duration") {
-      tableName = "duration_list";
-      label = "durasi";
-    }
+  const getMasterList = () => {
+    if (manageType === "fh") return fhList;
+    if (manageType === "package") return packageList;
+    if (manageType === "duration") return durationList;
 
-    const name = prompt(
-      `Masukkan ${label} baru:`
+    return [];
+  };
+
+  const toggleMasterSelection = (id: string) => {
+    setSelectedMasterIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
     );
+  };
 
-    if (!name || !name.trim()) return;
+  const selectAllMaster = () => {
+    const list = getMasterList();
 
-    const cleanName = name.trim();
+    if (selectedMasterIds.length === list.length) {
+      setSelectedMasterIds([]);
+    } else {
+      setSelectedMasterIds(list.map((item) => item.id));
+    }
+  };
+
+  const addMasterItem = async (type: Exclude<MasterType, null>) => {
+    const label =
+      type === "fh"
+        ? "FH"
+        : type === "package"
+        ? "Paket"
+        : "Durasi";
+
+    const name = prompt(`Masukkan nama ${label}:`);
+
+    if (!name?.trim()) return;
+
+    const table =
+      type === "fh"
+        ? "fh_list"
+        : type === "package"
+        ? "package_list"
+        : "duration_list";
 
     const { data, error } = await supabase
-      .from(tableName)
-      .insert([{ name: cleanName }])
+      .from(table)
+      .insert({
+        name: name.trim(),
+      })
       .select("id, name")
       .single();
 
     if (error) {
+      console.error(error);
+
       if (error.code === "23505") {
-        alert(
-          `${
-            type === "fh"
-              ? "FH"
-              : type === "package"
-              ? "Nama paket"
-              : "Durasi"
-          } tersebut sudah ada.`
-        );
+        alert(`${label} tersebut sudah ada.`);
       } else {
-        alert(
-          `Gagal menambahkan ${label}: ` +
-            error.message
-        );
+        alert(`Gagal menambahkan ${label}.`);
       }
 
       return;
     }
 
-    if (!data) return;
-
     if (type === "fh") {
-      setFhList((current) =>
-        [...current, data].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
+      setFhList((prev) =>
+        [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
       );
 
-      setForm((current) => ({
-        ...current,
+      setForm((prev) => ({
+        ...prev,
         fh: data.name,
       }));
     }
 
     if (type === "package") {
-      setPackageList((current) =>
-        [...current, data].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
+      setPackageList((prev) =>
+        [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
       );
 
-      setForm((current) => ({
-        ...current,
+      setForm((prev) => ({
+        ...prev,
         package_name: data.name,
       }));
     }
 
     if (type === "duration") {
-      setDurationList((current) =>
-        [...current, data].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
+      setDurationList((prev) =>
+        [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
       );
 
-      setForm((current) => ({
-        ...current,
+      setForm((prev) => ({
+        ...prev,
         duration: data.name,
       }));
     }
-  }
+  };
 
-  // =========================
-  // HAPUS MASTER DATA
-  // =========================
+  const deleteSelectedMaster = async () => {
+    if (!manageType || selectedMasterIds.length === 0) return;
 
-  async function deleteSelectedMaster() {
-    if (!manageType) return;
+    const list = getMasterList();
 
-    if (selectedMasterIds.length === 0) {
-      alert(
-        "Pilih minimal satu item yang ingin dibuang."
-      );
-      return;
-    }
-
-    const currentList = getMasterList();
-
-    const selectedItems = currentList.filter(
-      (item) =>
-        selectedMasterIds.includes(item.id)
+    const selectedItems = list.filter((item) =>
+      selectedMasterIds.includes(item.id)
     );
 
-    if (selectedItems.length === 0) return;
-
-    const names = selectedItems
-      .map((item) => item.name)
-      .join(", ");
-
-    const confirmed = confirm(
-      `Buang ${selectedItems.length} item berikut?\n\n${names}\n\nItem yang sudah pernah digunakan di transaksi tidak akan dihapus.`
+    const confirmDelete = confirm(
+      `Hapus ${selectedItems.length} item yang dipilih?`
     );
 
-    if (!confirmed) return;
+    if (!confirmDelete) return;
 
     setDeletingMaster(true);
 
-    let tableName = "";
-    let salesColumn = "";
+    const values = selectedItems.map((item) => item.name);
+
+    let column = "";
+
+    if (manageType === "fh") column = "fh";
+    if (manageType === "package") column = "package_name";
+    if (manageType === "duration") column = "duration";
+
+    const { data: usedSales, error: salesError } = await supabase
+      .from("sales")
+      .select(`id, ${column}`)
+      .in(column, values);
+
+    if (salesError) {
+      console.error(salesError);
+      alert("Gagal mengecek data penjualan.");
+      setDeletingMaster(false);
+      return;
+    }
+
+    if (usedSales && usedSales.length > 0) {
+      alert(
+        "Ada data yang sedang digunakan di penjualan. Item tersebut tidak bisa dihapus."
+      );
+      setDeletingMaster(false);
+      return;
+    }
+
+    const table =
+      manageType === "fh"
+        ? "fh_list"
+        : manageType === "package"
+        ? "package_list"
+        : "duration_list";
+
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .in("id", selectedMasterIds);
+
+    if (error) {
+      console.error(error);
+      alert("Gagal menghapus data.");
+      setDeletingMaster(false);
+      return;
+    }
 
     if (manageType === "fh") {
-      tableName = "fh_list";
-      salesColumn = "fh";
-    }
+      setFhList((prev) =>
+        prev.filter((item) => !selectedMasterIds.includes(item.id))
+      );
 
-    if (manageType === "package") {
-      tableName = "package_list";
-      salesColumn = "package_name";
-    }
-
-    if (manageType === "duration") {
-      tableName = "duration_list";
-      salesColumn = "duration";
-    }
-
-    const cannotDelete: string[] = [];
-    const deletedIds: number[] = [];
-
-    for (const item of selectedItems) {
-      const { data: usedSales, error: salesError } =
-        await supabase
-          .from("sales")
-          .select("id")
-          .eq(salesColumn, item.name)
-          .limit(1);
-
-      if (salesError) {
-        alert(
-          `Gagal mengecek "${item.name}": ${salesError.message}`
-        );
-        continue;
-      }
-
-      if (
-        usedSales &&
-        usedSales.length > 0
-      ) {
-        cannotDelete.push(item.name);
-        continue;
-      }
-
-      const { error: deleteError } =
-        await supabase
-          .from(tableName)
-          .delete()
-          .eq("id", item.id);
-
-      if (deleteError) {
-        alert(
-          `Gagal menghapus "${item.name}": ${deleteError.message}`
-        );
-        continue;
-      }
-
-      deletedIds.push(item.id);
-
-      if (
-        manageType === "fh" &&
-        form.fh === item.name
-      ) {
-        setForm((current) => ({
-          ...current,
+      if (values.includes(form.fh)) {
+        setForm((prev) => ({
+          ...prev,
           fh: "",
         }));
       }
+    }
 
-      if (
-        manageType === "package" &&
-        form.package_name === item.name
-      ) {
-        setForm((current) => ({
-          ...current,
+    if (manageType === "package") {
+      setPackageList((prev) =>
+        prev.filter((item) => !selectedMasterIds.includes(item.id))
+      );
+
+      if (values.includes(form.package_name)) {
+        setForm((prev) => ({
+          ...prev,
           package_name: "",
         }));
       }
+    }
 
-      if (
-        manageType === "duration" &&
-        form.duration === item.name
-      ) {
-        setForm((current) => ({
-          ...current,
+    if (manageType === "duration") {
+      setDurationList((prev) =>
+        prev.filter((item) => !selectedMasterIds.includes(item.id))
+      );
+
+      if (values.includes(form.duration)) {
+        setForm((prev) => ({
+          ...prev,
           duration: "",
         }));
       }
     }
 
-    if (manageType === "fh") {
-      setFhList((current) =>
-        current.filter(
-          (item) =>
-            !deletedIds.includes(item.id)
-        )
-      );
-    }
-
-    if (manageType === "package") {
-      setPackageList((current) =>
-        current.filter(
-          (item) =>
-            !deletedIds.includes(item.id)
-        )
-      );
-    }
-
-    if (manageType === "duration") {
-      setDurationList((current) =>
-        current.filter(
-          (item) =>
-            !deletedIds.includes(item.id)
-        )
-      );
-    }
-
     setSelectedMasterIds([]);
-
-    if (deletedIds.length > 0) {
-      let message = `${deletedIds.length} item berhasil dibuang.`;
-
-      if (cannotDelete.length > 0) {
-        message +=
-          `\n\nTidak bisa dibuang karena sudah digunakan di transaksi:\n- ${cannotDelete.join(
-            "\n- "
-          )}`;
-      }
-
-      alert(message);
-    } else if (cannotDelete.length > 0) {
-      alert(
-        "Tidak ada item yang dibuang karena semuanya sudah digunakan di transaksi."
-      );
-    }
-
     setDeletingMaster(false);
-  }
+  };
 
-  // =========================
-  // FILTER
-  // =========================
+  /* =========================
+     FILTER
+  ========================= */
 
   const filteredSales = useMemo(() => {
-    return sales.filter((sale) => {
-      const keyword =
-        search.toLowerCase();
+    const keyword = search.toLowerCase().trim();
 
+    return sales.filter((sale) => {
       const matchesSearch =
-        sale.buyer_name
-          ?.toLowerCase()
-          .includes(keyword) ||
-        sale.app_name
-          ?.toLowerCase()
-          .includes(keyword) ||
-        sale.fh
-          ?.toLowerCase()
-          .includes(keyword) ||
-        sale.package_name
-          ?.toLowerCase()
-          .includes(keyword) ||
-        sale.duration
-          ?.toLowerCase()
-          .includes(keyword);
+        !keyword ||
+        sale.buyer_name?.toLowerCase().includes(keyword) ||
+        sale.app_name?.toLowerCase().includes(keyword) ||
+        sale.fh?.toLowerCase().includes(keyword) ||
+        sale.package_name?.toLowerCase().includes(keyword) ||
+        sale.duration?.toLowerCase().includes(keyword);
 
       const matchesStatus =
-        statusFilter === "All" ||
-        sale.order_status ===
-          statusFilter;
+        statusFilter === "All" || sale.order_status === statusFilter;
 
-      const matchesStartDate =
-        !startDate ||
-        sale.order_date >= startDate;
+      const matchesStart =
+        !startDate || sale.order_date >= startDate;
 
-      const matchesEndDate =
-        !endDate ||
-        sale.order_date <= endDate;
+      const matchesEnd =
+        !endDate || sale.order_date <= endDate;
 
       return (
         matchesSearch &&
         matchesStatus &&
-        matchesStartDate &&
-        matchesEndDate
+        matchesStart &&
+        matchesEnd
       );
     });
-  }, [
-    sales,
-    search,
-    statusFilter,
-    startDate,
-    endDate,
-  ]);
+  }, [sales, search, statusFilter, startDate, endDate]);
 
-  // =========================
-  // STATISTIK
-  // =========================
-
-  const totalOmzet =
-    filteredSales.reduce(
-      (total, sale) =>
-        total +
-        Number(
-          sale.selling_price || 0
-        ) *
-          Number(
-            sale.quantity || 0
-          ),
+  const totalOmzet = useMemo(() => {
+    return filteredSales.reduce(
+      (total, sale) => total + Number(sale.selling_price) * Number(sale.quantity),
       0
     );
+  }, [filteredSales]);
 
-  const totalProfit =
-    filteredSales.reduce(
-      (total, sale) =>
-        total +
-        Number(
-          sale.profit || 0
-        ),
+  const totalProfit = useMemo(() => {
+    return filteredSales.reduce(
+      (total, sale) => total + Number(sale.profit || 0),
       0
     );
+  }, [filteredSales]);
 
-  // =========================
-  // EXPORT CSV
-  // =========================
+  /* =========================
+     CSV
+  ========================= */
 
-  function exportCSV() {
+  const exportCSV = () => {
     if (filteredSales.length === 0) {
-      alert(
-        "Tidak ada data yang bisa diexport."
-      );
+      alert("Tidak ada data untuk diexport.");
       return;
     }
 
@@ -706,1523 +487,961 @@ export default function PenjualanPage() {
       "Paket",
       "Durasi",
       "Qty",
-      "Harga Modal",
+      "Modal",
       "Harga Jual",
-      "Total Jual",
       "Profit",
-      "Metode Pembayaran",
+      "Payment",
       "Status",
       "Catatan",
     ];
 
-    const rows = filteredSales.map(
-      (sale) => [
-        sale.order_date || "",
-        sale.buyer_name || "",
-        sale.app_name || "",
-        sale.fh || "",
-        sale.package_name || "",
-        sale.duration || "",
-        sale.quantity || 0,
-        sale.purchase_price || 0,
-        sale.selling_price || 0,
-        Number(
-          sale.selling_price || 0
-        ) *
-          Number(
-            sale.quantity || 0
-          ),
-        sale.profit || 0,
-        sale.payment_method || "",
-        sale.order_status || "",
-        sale.notes || "",
-      ]
-    );
+    const rows = filteredSales.map((sale) => [
+      sale.order_date,
+      sale.buyer_name,
+      sale.app_name,
+      sale.fh || "",
+      sale.package_name || "",
+      sale.duration || "",
+      sale.quantity,
+      sale.purchase_price,
+      sale.selling_price,
+      sale.profit,
+      sale.payment_method || "",
+      sale.order_status || "",
+      sale.notes || "",
+    ]);
 
-    const csvContent = [
+    const csv = [
       headers,
       ...rows,
     ]
       .map((row) =>
         row
-          .map((value) => {
-            const text =
-              String(value ?? "");
-
-            return `"${text.replace(
-              /"/g,
-              '""'
-            )}"`;
-          })
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
           .join(",")
       )
       .join("\n");
 
-    const blob = new Blob(
-      ["\ufeff" + csvContent],
-      {
-        type: "text/csv;charset=utf-8;",
-      }
-    );
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-    const url =
-      URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
 
-    const link =
-      document.createElement("a");
-
-    const dateLabel =
-      startDate || endDate
-        ? `${startDate || "awal"}_sampai_${
-            endDate || "sekarang"
-          }`
-        : new Date()
-            .toISOString()
-            .split("T")[0];
-
+    const link = document.createElement("a");
     link.href = url;
-
-    link.download = `rekapan_penjualan_${dateLabel}.csv`;
-
-    document.body.appendChild(link);
+    link.download = `rekapan-penjualan-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
 
     link.click();
 
-    document.body.removeChild(link);
-
     URL.revokeObjectURL(url);
-  }
+  };
 
-  // =========================
-  // RESET FILTER
-  // =========================
-
-  function resetFilters() {
+  const resetFilters = () => {
     setSearch("");
     setStatusFilter("All");
     setStartDate("");
     setEndDate("");
-  }
+  };
 
-  // =========================
-  // TAMBAH ORDER
-  // =========================
+  /* =========================
+     FORM
+  ========================= */
 
-  function openAddForm() {
+  const openAddForm = () => {
     setEditingId(null);
 
     setForm({
       ...emptyForm,
-      order_date: new Date()
-        .toISOString()
-        .split("T")[0],
+      order_date: new Date().toISOString().split("T")[0],
     });
 
     setShowForm(true);
-  }
+  };
 
-  // =========================
-  // EDIT ORDER
-  // =========================
-
-  function openEditForm(
-    sale: Sale
-  ) {
+  const openEditForm = (sale: Sale) => {
     setEditingId(sale.id);
 
     setForm({
-      order_date:
-        sale.order_date ||
-        new Date()
-          .toISOString()
-          .split("T")[0],
-
-      buyer_name:
-        sale.buyer_name || "",
-
-      app_name:
-        sale.app_name || "",
-
-      fh:
-        sale.fh || "",
-
-      package_name:
-        sale.package_name || "",
-
-      duration:
-        sale.duration || "",
-
-      quantity: String(
-        sale.quantity || 1
-      ),
-
-      purchase_price: String(
-        sale.purchase_price ?? ""
-      ),
-
-      selling_price: String(
-        sale.selling_price ?? ""
-      ),
-
-      payment_method:
-        sale.payment_method ||
-        "QRIS",
-
-      order_status:
-        sale.order_status ||
-        "Completed",
-
-      notes:
-        sale.notes || "",
+      order_date: sale.order_date || "",
+      buyer_name: sale.buyer_name || "",
+      app_name: sale.app_name || "",
+      fh: sale.fh || "",
+      package_name: sale.package_name || "",
+      duration: sale.duration || "",
+      quantity: String(sale.quantity || 1),
+      purchase_price: String(sale.purchase_price || 0),
+      selling_price: String(sale.selling_price || 0),
+      payment_method: sale.payment_method || "QRIS",
+      order_status: sale.order_status || "Completed",
+      notes: sale.notes || "",
     });
 
     setShowForm(true);
-  }
+  };
 
-  // =========================
-  // CLOSE FORM
-  // =========================
-
-  function closeForm() {
+  const closeForm = () => {
     setShowForm(false);
-
     setEditingId(null);
+    setForm(emptyForm);
+  };
 
-    setForm({
-      ...emptyForm,
-      order_date: new Date()
-        .toISOString()
-        .split("T")[0],
-    });
-  }
+  const handleProductChange = (productName: string) => {
+    const product = products.find(
+      (item) => item.name === productName
+    );
 
-  // =========================
-  // PILIH PRODUK
-  // =========================
-
-  function handleProductChange(
-    productName: string
-  ) {
-    const normalizedName =
-      productName
-        .trim()
-        .toLowerCase();
-
-    const selectedProduct =
-      products.find(
-        (product) =>
-          product.name
-            .trim()
-            .toLowerCase() ===
-          normalizedName
-      );
-
-    if (!selectedProduct) {
-      setForm((current) => ({
-        ...current,
-        app_name:
-          productName,
-        purchase_price: "",
-        selling_price: "",
-      }));
-
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-
-      app_name:
-        selectedProduct.name,
-
-      purchase_price: String(
-        Number(
-          selectedProduct.purchase_price ||
-            0
-        )
-      ),
-
-      selling_price: String(
-        Number(
-          selectedProduct.selling_price ||
-            0
-        )
-      ),
+    setForm((prev) => ({
+      ...prev,
+      app_name: productName,
+      purchase_price:
+        product && product.purchase_price !== undefined
+          ? String(product.purchase_price)
+          : prev.purchase_price,
+      selling_price:
+        product && product.selling_price !== undefined
+          ? String(product.selling_price)
+          : prev.selling_price,
     }));
-  }
+  };
 
-  // =========================
-  // SIMPAN ORDER
-  // =========================
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  async function handleSubmit(
-    e: FormEvent
-  ) {
-    e.preventDefault();
-
-    if (
-      !form.buyer_name.trim()
-    ) {
-      alert(
-        "Nama buyer wajib diisi."
-      );
+    if (!form.buyer_name.trim()) {
+      alert("Nama buyer wajib diisi.");
       return;
     }
 
-    if (!form.app_name) {
-      alert(
-        "Pilih aplikasi terlebih dahulu."
-      );
+    if (!form.app_name.trim()) {
+      alert("Aplikasi wajib dipilih.");
       return;
     }
 
-    if (!form.fh) {
-      alert(
-        "Pilih FH terlebih dahulu."
-      );
+    if (!form.fh.trim()) {
+      alert("FH wajib dipilih.");
       return;
     }
 
-    if (!form.package_name) {
-      alert(
-        "Pilih nama paket terlebih dahulu."
-      );
+    if (!form.package_name.trim()) {
+      alert("Paket wajib dipilih.");
       return;
     }
 
-    if (!form.duration) {
-      alert(
-        "Pilih durasi terlebih dahulu."
-      );
+    if (!form.duration.trim()) {
+      alert("Durasi wajib dipilih.");
       return;
     }
 
-    if (
-      form.purchase_price ===
-        "" ||
-      form.selling_price === ""
-    ) {
-      alert(
-        "Harga modal dan harga jual wajib diisi."
-      );
+    const quantity = Number(form.quantity);
+    const purchasePrice = Number(form.purchase_price);
+    const sellingPrice = Number(form.selling_price);
+
+    if (!quantity || quantity <= 0) {
+      alert("Qty harus lebih dari 0.");
       return;
     }
 
-    const purchasePrice =
-      Number(
-        form.purchase_price
-      );
-
-    const sellingPrice =
-      Number(
-        form.selling_price
-      );
-
-    const quantity =
-      Number(form.quantity) ||
-      1;
-
-    if (
-      isNaN(purchasePrice) ||
-      purchasePrice < 0
-    ) {
-      alert(
-        "Harga modal tidak valid."
-      );
-      return;
-    }
-
-    if (
-      isNaN(sellingPrice) ||
-      sellingPrice < 0
-    ) {
-      alert(
-        "Harga jual tidak valid."
-      );
-      return;
-    }
-
-    if (quantity < 1) {
-      alert(
-        "Quantity minimal 1."
-      );
+    if (purchasePrice < 0 || sellingPrice < 0) {
+      alert("Harga tidak boleh negatif.");
       return;
     }
 
     setSaving(true);
 
-    const saleData = {
-      order_date:
-        form.order_date,
-
-      buyer_name:
-        form.buyer_name.trim(),
-
-      app_name:
-        form.app_name,
-
-      fh:
-        form.fh,
-
-      package_name:
-        form.package_name,
-
-      duration:
-        form.duration,
-
+    const payload = {
+      order_date: form.order_date,
+      buyer_name: form.buyer_name.trim(),
+      app_name: form.app_name.trim(),
+      fh: form.fh.trim(),
+      package_name: form.package_name.trim(),
+      duration: form.duration.trim(),
       quantity,
-
-      purchase_price:
-        purchasePrice,
-
-      selling_price:
-        sellingPrice,
-
-      payment_method:
-        form.payment_method,
-
-      order_status:
-        form.order_status,
-
-      notes:
-        form.notes.trim(),
+      purchase_price: purchasePrice,
+      selling_price: sellingPrice,
+      payment_method: form.payment_method,
+      order_status: form.order_status,
+      notes: form.notes.trim() || null,
     };
 
-    let error;
-
     if (editingId) {
-      const response =
-        await supabase
-          .from("sales")
-          .update(saleData)
-          .eq("id", editingId);
+      const { error } = await supabase
+        .from("sales")
+        .update(payload)
+        .eq("id", editingId);
 
-      error =
-        response.error;
+      if (error) {
+        console.error(error);
+        alert("Gagal mengubah order.");
+        setSaving(false);
+        return;
+      }
     } else {
-      const response =
-        await supabase
-          .from("sales")
-          .insert([
-            saleData,
-          ]);
+      const { error } = await supabase
+        .from("sales")
+        .insert(payload);
 
-      error =
-        response.error;
+      if (error) {
+        console.error(error);
+        alert("Gagal menambahkan order.");
+        setSaving(false);
+        return;
+      }
     }
 
-    if (error) {
-      alert(
-        "Gagal menyimpan: " +
-          error.message
-      );
-    } else {
-      alert(
-        editingId
-          ? "Data penjualan berhasil diperbarui ♡"
-          : "Order berhasil ditambahkan ♡"
-      );
-
-      closeForm();
-
-      await getSales();
-    }
+    await getSales();
 
     setSaving(false);
-  }
+    closeForm();
+  };
 
-  // =========================
-  // HAPUS ORDER
-  // =========================
+  /* =========================
+     DELETE SALE
+  ========================= */
 
-  async function deleteSale(
-    sale: Sale
-  ) {
-    const confirmed =
-      confirm(
-        `Hapus order ${sale.buyer_name} - ${sale.app_name}?`
-      );
+  const deleteSale = async (sale: Sale) => {
+    const confirmDelete = confirm(
+      `Hapus order dari "${sale.buyer_name}"?`
+    );
 
-    if (!confirmed) return;
+    if (!confirmDelete) return;
 
-    const {
-      data: warrantyData,
-      error:
-        warrantyCheckError,
-    } = await supabase
+    const { data: warranties, error: warrantyError } = await supabase
       .from("warranties")
       .select("id")
-      .eq("sale_id", sale.id);
+      .eq("sale_id", sale.id)
+      .limit(1);
 
-    if (warrantyCheckError) {
-      alert(
-        "Tidak bisa mengecek garansi terkait: " +
-          warrantyCheckError.message
-      );
+    if (warrantyError) {
+      console.error(warrantyError);
+      alert("Gagal mengecek garansi.");
       return;
     }
 
-    if (
-      warrantyData &&
-      warrantyData.length > 0
-    ) {
+    if (warranties && warranties.length > 0) {
       alert(
         "Order ini masih memiliki data garansi. Hapus data garansinya terlebih dahulu."
       );
       return;
     }
 
-    const { error } =
-      await supabase
-        .from("sales")
-        .delete()
-        .eq("id", sale.id);
+    const { error } = await supabase
+      .from("sales")
+      .delete()
+      .eq("id", sale.id);
 
     if (error) {
-      alert(
-        "Gagal menghapus: " +
-          error.message
-      );
+      console.error(error);
+      alert("Gagal menghapus order.");
       return;
     }
 
-    alert(
-      "Order berhasil dihapus."
+    setSales((prev) =>
+      prev.filter((item) => item.id !== sale.id)
     );
+  };
 
-    await getSales();
-  }
+  /* =========================
+     UI
+  ========================= */
 
-  // =========================
-  // LOADING
-  // =========================
+  const statusClass = (status: string | null) => {
+    switch (status) {
+      case "Completed":
+        return "bg-green-50 text-green-600";
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-pink-200 border-t-pink-500" />
+      case "On Going":
+        return "bg-blue-50 text-blue-600";
 
-          <p className="text-sm text-gray-400">
-            Loading penjualan...
-          </p>
-        </div>
-      </div>
-    );
-  }
+      case "Pending":
+        return "bg-yellow-50 text-yellow-600";
 
-  // =========================
-  // UI
-  // =========================
+      case "Cancelled":
+        return "bg-red-50 text-red-500";
+
+      case "Refunded":
+        return "bg-purple-50 text-purple-600";
+
+      default:
+        return "bg-gray-50 text-gray-500";
+    }
+  };
 
   return (
-    <div>
-      {/* HEADER */}
+    <div className="min-h-screen bg-[#fffafd] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1600px]">
 
-      <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="text-sm text-pink-400">
-            manage your orders ♡
-          </p>
-
-          <h1 className="mt-1 text-3xl font-bold text-gray-800">
-            Penjualan
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-400">
-            Rekap semua transaksi muviee.idd.
-          </p>
-        </div>
-
-        <button
-          onClick={
-            openAddForm
-          }
-          className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-pink-600"
-        >
-          + Tambah Order
-        </button>
-      </div>
-
-      {/* SUMMARY */}
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">
-            Total Order
-          </p>
-
-          <p className="mt-2 text-2xl font-bold text-gray-800">
-            {
-              filteredSales.length
-            }
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">
-            Total Omzet
-          </p>
-
-          <p className="mt-2 text-xl font-bold text-pink-500">
-            {formatRupiah(
-              totalOmzet
-            )}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">
-            Total Profit
-          </p>
-
-          <p className="mt-2 text-xl font-bold text-green-600">
-            {formatRupiah(
-              totalProfit
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* FILTER */}
-
-      <div className="mb-6 rounded-2xl border border-pink-100 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <input
-            type="text"
-            placeholder="Cari buyer, aplikasi, FH, paket..."
-            value={search}
-            onChange={(e) =>
-              setSearch(
-                e.target.value
-              )
-            }
-            className="rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400"
-          />
-
-          <select
-            value={
-              statusFilter
-            }
-            onChange={(e) =>
-              setStatusFilter(
-                e.target.value
-              )
-            }
-            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-          >
-            <option value="All">
-              Semua Status
-            </option>
-
-            <option value="Completed">
-              Completed
-            </option>
-
-            <option value="On Going">
-              On Going
-            </option>
-
-            <option value="Pending">
-              Pending
-            </option>
-
-            <option value="Cancelled">
-              Cancelled
-            </option>
-
-            <option value="Refunded">
-              Refunded
-            </option>
-          </select>
-
+        {/* HEADER */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <label className="mb-1 block text-[11px] text-gray-400">
-              Dari tanggal
-            </label>
-
-            <input
-              type="date"
-              value={
-                startDate
-              }
-              onChange={(e) =>
-                setStartDate(
-                  e.target.value
-                )
-              }
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-[11px] text-gray-400">
-              Sampai tanggal
-            </label>
-
-            <input
-              type="date"
-              value={
-                endDate
-              }
-              min={
-                startDate ||
-                undefined
-              }
-              onChange={(e) =>
-                setEndDate(
-                  e.target.value
-                )
-              }
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-            />
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            onClick={
-              resetFilters
-            }
-            className="rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50"
-          >
-            Reset Filter
-          </button>
-
-          <button
-            onClick={
-              exportCSV
-            }
-            className="rounded-xl bg-green-500 px-4 py-2.5 text-xs font-semibold text-white hover:bg-green-600"
-          >
-            ↓ Export CSV
-          </button>
-        </div>
-      </div>
-
-      {/* TABLE */}
-
-      <div className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
-        <div className="border-b border-pink-100 px-6 py-5">
-          <h2 className="font-semibold text-gray-800">
-            Data Penjualan
-          </h2>
-
-          <p className="mt-1 text-xs text-gray-400">
-            {
-              filteredSales.length
-            }{" "}
-            data ditemukan
-          </p>
-        </div>
-
-        {filteredSales.length ===
-        0 ? (
-          <div className="px-6 py-16 text-center">
-            <div className="text-4xl">
-              🛒
-            </div>
-
-            <p className="mt-3 font-medium text-gray-600">
-              Belum ada data
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pink-400">
+              manage your orders ♡
             </p>
+
+            <h1 className="mt-1 text-2xl font-bold text-gray-800">
+              Penjualan
+            </h1>
+
+            <p className="mt-1 text-sm text-gray-400">
+              Rekap semua transaksi penjualan kamu.
+            </p>
+          </div>
+
+          <button
+            onClick={openAddForm}
+            className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-pink-600"
+          >
+            + Tambah Order
+          </button>
+        </div>
+
+        {/* SUMMARY */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+            <p className="text-xs text-gray-400">Total Order</p>
+
+            <p className="mt-2 text-2xl font-bold text-gray-800">
+              {filteredSales.length}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+            <p className="text-xs text-gray-400">Total Omzet</p>
+
+            <p className="mt-2 text-2xl font-bold text-pink-500">
+              {formatRupiah(totalOmzet)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+            <p className="text-xs text-gray-400">Total Profit</p>
+
+            <p className="mt-2 text-2xl font-bold text-green-500">
+              {formatRupiah(totalProfit)}
+            </p>
+          </div>
+        </div>
+
+        {/* FILTER */}
+        <div className="mb-6 rounded-2xl border border-pink-100 bg-white p-4 shadow-sm">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_170px_150px_150px_auto_auto]">
+
+            <input
+              type="text"
+              placeholder="Cari buyer, aplikasi, FH, paket..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-pink-300"
+            >
+              <option value="All">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="On Going">On Going</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Refunded">Refunded</option>
+            </select>
+
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-pink-300"
+            />
+
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-pink-300"
+            />
+
+            <button
+              onClick={resetFilters}
+              className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-50"
+            >
+              Reset
+            </button>
+
+            <button
+              onClick={exportCSV}
+              className="rounded-xl bg-gray-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-900"
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        {/* TABLE */}
+        <div className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
+
+          <div className="border-b border-pink-100 px-5 py-4">
+            <h2 className="font-semibold text-gray-800">
+              Data Penjualan
+            </h2>
 
             <p className="mt-1 text-xs text-gray-400">
-              Tambahkan order pertama kamu.
+              {filteredSales.length} data ditemukan
             </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1250px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-left">
-                  <th className="px-6 py-4 text-xs text-gray-400">
-                    Tanggal
-                  </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Buyer
-                  </th>
+          {loading ? (
+            <div className="px-5 py-16 text-center text-sm text-gray-400">
+              Loading data...
+            </div>
+          ) : filteredSales.length === 0 ? (
+            <div className="px-5 py-16 text-center">
+              <p className="text-sm font-medium text-gray-500">
+                Belum ada data penjualan ♡
+              </p>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Aplikasi
-                  </th>
+              <p className="mt-1 text-xs text-gray-400">
+                Tambahkan order pertama kamu.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    FH
-                  </th>
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50 text-left">
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Paket
-                  </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-[11px] font-medium text-gray-400">
+                      Tanggal
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Durasi
-                  </th>
+                    <th className="min-w-[130px] px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Buyer
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Qty
-                  </th>
+                    <th className="min-w-[100px] px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Aplikasi
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Modal
-                  </th>
+                    <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
+                      FH
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Harga Jual
-                  </th>
+                    <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Paket
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Profit
-                  </th>
+                    <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Durasi
+                    </th>
 
-                  <th className="px-4 py-4 text-xs text-gray-400">
-                    Status
-                  </th>
+                    <th className="px-3 py-3 text-center text-[11px] font-medium text-gray-400">
+                      Qty
+                    </th>
 
-                  <th className="px-6 py-4 text-xs text-gray-400">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+                    <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Modal
+                    </th>
 
-              <tbody>
-                {filteredSales.map(
-                  (sale) => (
+                    <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Harga Jual
+                    </th>
+
+                    <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Profit
+                    </th>
+
+                    <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
+                      Status
+                    </th>
+
+                    <th className="sticky right-0 z-10 whitespace-nowrap bg-gray-50/95 px-4 py-3 text-[11px] font-medium text-gray-400">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredSales.map((sale) => (
                     <tr
-                      key={
-                        sale.id
-                      }
+                      key={sale.id}
                       className="border-b border-gray-50 last:border-0 hover:bg-pink-50/30"
                     >
-                      <td className="px-6 py-4 text-gray-500">
-                        {sale.order_date
-                          ? new Date(
-                              `${sale.order_date}T00:00:00`
-                            ).toLocaleDateString(
-                              "id-ID"
-                            )
-                          : "-"}
+
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                        {sale.order_date}
                       </td>
 
-                      <td className="px-4 py-4">
-                        <p className="font-medium text-gray-700">
-                          {
-                            sale.buyer_name
-                          }
-                        </p>
-
-                        {sale.notes && (
-                          <p className="mt-1 max-w-[150px] truncate text-[10px] text-gray-400">
-                            {
-                              sale.notes
-                            }
-                          </p>
-                        )}
+                      <td
+                        className="max-w-[160px] truncate px-3 py-3 font-medium text-gray-700"
+                        title={sale.buyer_name}
+                      >
+                        {sale.buyer_name}
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-gray-700">
-                        {
-                          sale.app_name
-                        }
+                      <td
+                        className="max-w-[130px] truncate px-3 py-3 text-gray-600"
+                        title={sale.app_name}
+                      >
+                        {sale.app_name}
                       </td>
 
-                      <td className="px-4 py-4 text-gray-600">
-                        {
-                          sale.fh ||
-                          "-"
-                        }
+                      <td
+                        className="max-w-[100px] truncate px-3 py-3 text-gray-500"
+                        title={sale.fh || "-"}
+                      >
+                        {sale.fh || "-"}
                       </td>
 
-                      <td className="px-4 py-4 text-gray-600">
-                        {
-                          sale.package_name ||
-                          "-"
-                        }
+                      <td
+                        className="max-w-[110px] truncate px-3 py-3 text-gray-500"
+                        title={sale.package_name || "-"}
+                      >
+                        {sale.package_name || "-"}
                       </td>
 
-                      <td className="px-4 py-4 text-gray-600">
-                        {
-                          sale.duration ||
-                          "-"
-                        }
+                      <td className="whitespace-nowrap px-3 py-3 text-gray-500">
+                        {sale.duration || "-"}
                       </td>
 
-                      <td className="px-4 py-4 text-gray-600">
-                        {
-                          sale.quantity
-                        }
+                      <td className="px-3 py-3 text-center text-gray-600">
+                        {sale.quantity}
                       </td>
 
-                      <td className="px-4 py-4 text-gray-500">
-                        {formatRupiah(
-                          Number(
-                            sale.purchase_price ||
-                              0
-                          )
-                        )}
+                      <td className="whitespace-nowrap px-3 py-3 text-gray-500">
+                        {formatRupiah(Number(sale.purchase_price))}
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-gray-700">
-                        {formatRupiah(
-                          Number(
-                            sale.selling_price ||
-                              0
-                          )
-                        )}
+                      <td className="whitespace-nowrap px-3 py-3 font-medium text-gray-700">
+                        {formatRupiah(Number(sale.selling_price))}
                       </td>
 
-                      <td className="px-4 py-4 font-semibold text-green-600">
-                        {formatRupiah(
-                          Number(
-                            sale.profit ||
-                              0
-                          )
-                        )}
+                      <td className="whitespace-nowrap px-3 py-3 font-semibold text-green-500">
+                        {formatRupiah(Number(sale.profit))}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-3">
                         <span
-                          className={`rounded-full px-3 py-1 text-[10px] font-medium ${
-                            sale.order_status ===
-                            "Completed"
-                              ? "bg-green-50 text-green-600"
-                              : sale.order_status ===
-                                "Cancelled"
-                              ? "bg-red-50 text-red-500"
-                              : sale.order_status ===
-                                "On Going"
-                              ? "bg-blue-50 text-blue-500"
-                              : sale.order_status ===
-                                "Refunded"
-                              ? "bg-gray-100 text-gray-500"
-                              : "bg-yellow-50 text-yellow-600"
-                          }`}
-                        >
-                          {
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${statusClass(
                             sale.order_status
-                          }
+                          )}`}
+                        >
+                          {sale.order_status || "-"}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                      <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-4 py-3 shadow-[-4px_0_8px_-6px_rgba(0,0,0,0.15)]">
+
+                        <div className="flex gap-1.5">
+
                           <button
-                            onClick={() =>
-                              openEditForm(
-                                sale
-                              )
-                            }
-                            className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-500 hover:bg-blue-100"
+                            onClick={() => openEditForm(sale)}
+                            className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-medium text-blue-500 hover:bg-blue-100"
                           >
                             Edit
                           </button>
 
                           <button
-                            onClick={() =>
-                              deleteSale(
-                                sale
-                              )
-                            }
-                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-100"
+                            onClick={() => deleteSale(sale)}
+                            className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-medium text-red-500 hover:bg-red-100"
                           >
                             Hapus
                           </button>
+
                         </div>
                       </td>
+
                     </tr>
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  ))}
+                </tbody>
+
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* FORM MODAL */}
+      {/* =========================
+          ADD / EDIT MODAL
+      ========================= */}
 
       {showForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-pink-100 bg-white px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-pink-100 bg-white px-6 py-5">
+
               <div>
-                <h2 className="font-semibold text-gray-800">
-                  {editingId
-                    ? "Edit Order"
-                    : "Tambah Order"}
+                <h2 className="text-lg font-bold text-gray-800">
+                  {editingId ? "Edit Order" : "Tambah Order"}
                 </h2>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  Isi informasi transaksi di bawah.
+                  Isi detail transaksi kamu ♡
                 </p>
               </div>
 
               <button
-                onClick={
-                  closeForm
-                }
-                className="rounded-lg px-3 py-2 text-gray-400 hover:bg-gray-100"
+                onClick={closeForm}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100"
               >
                 ✕
               </button>
+
             </div>
 
             <form
-              onSubmit={
-                handleSubmit
-              }
+              onSubmit={handleSubmit}
               className="space-y-5 p-6"
             >
-              {/* TANGGAL + BUYER */}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Tanggal Order
-                  </label>
-
-                  <input
-                    type="date"
-                    value={
-                      form.order_date
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        order_date:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Nama Buyer
-                  </label>
-
-                  <input
-                    type="text"
-                    value={
-                      form.buyer_name
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        buyer_name:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="contoh: Aulia"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* APLIKASI + FH */}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Aplikasi
-                  </label>
-
-                  <select
-                    value={
-                      form.app_name
-                    }
-                    onChange={(e) =>
-                      handleProductChange(
-                        e.target.value
-                      )
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  >
-                    <option value="">
-                      Pilih aplikasi
-                    </option>
-
-                    {products.map(
-                      (
-                        product
-                      ) => (
-                        <option
-                          key={
-                            product.id
-                          }
-                          value={
-                            product.name
-                          }
-                        >
-                          {
-                            product.name
-                          }
-                        </option>
-                      )
-                    )}
-                  </select>
-
-                  {form.app_name &&
-                    products.length >
-                      0 && (
-                      <p className="mt-2 text-[11px] text-pink-400">
-                        Harga otomatis diambil dari Produk ♡
-                      </p>
-                    )}
-                </div>
-
-                {/* FH */}
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    FH
-                  </label>
-
-                  <div className="flex gap-2">
-                    <select
-                      value={
-                        form.fh
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          fh: e.target.value,
-                        })
-                      }
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                      required
-                    >
-                      <option value="">
-                        Pilih FH
-                      </option>
-
-                      {fhList.map(
-                        (
-                          fh
-                        ) => (
-                          <option
-                            key={
-                              fh.id
-                            }
-                            value={
-                              fh.name
-                            }
-                          >
-                            {
-                              fh.name
-                            }
-                          </option>
-                        )
-                      )}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openManage(
-                          "fh"
-                        )
-                      }
-                      className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-semibold text-pink-500 hover:bg-pink-100"
-                    >
-                      Kelola
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* PAKET + DURASI */}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* PAKET */}
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Nama Paket
-                  </label>
-
-                  <div className="flex gap-2">
-                    <select
-                      value={
-                        form.package_name
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          package_name:
-                            e.target.value,
-                        })
-                      }
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                      required
-                    >
-                      <option value="">
-                        Pilih nama paket
-                      </option>
-
-                      {packageList.map(
-                        (
-                          item
-                        ) => (
-                          <option
-                            key={
-                              item.id
-                            }
-                            value={
-                              item.name
-                            }
-                          >
-                            {
-                              item.name
-                            }
-                          </option>
-                        )
-                      )}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openManage(
-                          "package"
-                        )
-                      }
-                      className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-semibold text-pink-500 hover:bg-pink-100"
-                    >
-                      Kelola
-                    </button>
-                  </div>
-                </div>
-
-                {/* DURASI */}
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Durasi
-                  </label>
-
-                  <div className="flex gap-2">
-                    <select
-                      value={
-                        form.duration
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          duration:
-                            e.target.value,
-                        })
-                      }
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                      required
-                    >
-                      <option value="">
-                        Pilih durasi
-                      </option>
-
-                      {durationList.map(
-                        (
-                          item
-                        ) => (
-                          <option
-                            key={
-                              item.id
-                            }
-                            value={
-                              item.name
-                            }
-                          >
-                            {
-                              item.name
-                            }
-                          </option>
-                        )
-                      )}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openManage(
-                          "duration"
-                        )
-                      }
-                      className="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-xs font-semibold text-pink-500 hover:bg-pink-100"
-                    >
-                      Kelola
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* QTY */}
-
+              {/* Tanggal */}
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-600">
-                  Quantity
+                <label className="mb-2 block text-xs font-medium text-gray-500">
+                  Tanggal
                 </label>
 
                 <input
-                  type="number"
-                  min="1"
-                  value={
-                    form.quantity
-                  }
+                  type="date"
+                  value={form.order_date}
                   onChange={(e) =>
-                    setForm({
-                      ...form,
-                      quantity:
-                        e.target.value,
-                    })
+                    setForm((prev) => ({
+                      ...prev,
+                      order_date: e.target.value,
+                    }))
                   }
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
                   required
                 />
               </div>
 
-              {/* HARGA */}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Harga Modal / Firsthand
-                  </label>
-
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                      Rp
-                    </span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        form.purchase_price
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          purchase_price:
-                            e.target.value,
-                        })
-                      }
-                      placeholder="15000"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
-                      required
-                    />
-                  </div>
-
-                  <p className="mt-1 text-[10px] text-gray-400">
-                    Bisa diubah manual.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Harga Jual
-                  </label>
-
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                      Rp
-                    </span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        form.selling_price
-                      }
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          selling_price:
-                            e.target.value,
-                        })
-                      }
-                      placeholder="35000"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
-                      required
-                    />
-                  </div>
-
-                  <p className="mt-1 text-[10px] text-gray-400">
-                    Bisa diubah manual.
-                  </p>
-                </div>
-              </div>
-
-              {/* PROFIT */}
-
-              {form.purchase_price !==
-                "" &&
-                form.selling_price !==
-                  "" && (
-                  <div className="rounded-xl bg-green-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-400">
-                          Estimasi profit
-                        </p>
-
-                        <p className="mt-1 text-lg font-bold text-green-600">
-                          {formatRupiah(
-                            (Number(
-                              form.selling_price
-                            ) -
-                              Number(
-                                form.purchase_price
-                              )) *
-                              Number(
-                                form.quantity ||
-                                  1
-                              )
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-400">
-                          Per item
-                        </p>
-
-                        <p className="mt-1 text-xs font-semibold text-green-600">
-                          {formatRupiah(
-                            Number(
-                              form.selling_price
-                            ) -
-                              Number(
-                                form.purchase_price
-                              )
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              {/* PEMBAYARAN + STATUS */}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Metode Pembayaran
-                  </label>
-
-                  <select
-                    value={
-                      form.payment_method
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        payment_method:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                  >
-                    <option>
-                      QRIS
-                    </option>
-                    <option>
-                      GoPay
-                    </option>
-                    <option>
-                      DANA
-                    </option>
-                    <option>
-                      OVO
-                    </option>
-                    <option>
-                      Bank Transfer
-                    </option>
-                    <option>
-                      Cash
-                    </option>
-                    <option>
-                      Lainnya
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Status Order
-                  </label>
-
-                  <select
-                    value={
-                      form.order_status
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        order_status:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
-                  >
-                    <option>
-                      Completed
-                    </option>
-
-                    <option>
-                      On Going
-                    </option>
-
-                    <option>
-                      Pending
-                    </option>
-
-                    <option>
-                      Cancelled
-                    </option>
-
-                    <option>
-                      Refunded
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              {/* CATATAN */}
-
+              {/* Buyer */}
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-600">
+                <label className="mb-2 block text-xs font-medium text-gray-500">
+                  Nama Buyer
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Contoh: @buyername"
+                  value={form.buyer_name}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      buyer_name: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
+                  required
+                />
+              </div>
+
+              {/* App */}
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-500">
+                  Aplikasi
+                </label>
+
+                <select
+                  value={form.app_name}
+                  onChange={(e) =>
+                    handleProductChange(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                  required
+                >
+                  <option value="">Pilih aplikasi</option>
+
+                  {products.map((product) => (
+                    <option
+                      key={product.id}
+                      value={product.name}
+                    >
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* FH + Package */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-xs font-medium text-gray-500">
+                      FH
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => openManage("fh")}
+                      className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                    >
+                      Kelola
+                    </button>
+                  </div>
+
+                  <select
+                    value={form.fh}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        fh: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                    required
+                  >
+                    <option value="">Pilih FH</option>
+
+                    {fhList.map((item) => (
+                      <option key={item.id} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="text-xs font-medium text-gray-500">
+                      Paket
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => openManage("package")}
+                      className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                    >
+                      Kelola
+                    </button>
+                  </div>
+
+                  <select
+                    value={form.package_name}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        package_name: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                    required
+                  >
+                    <option value="">Pilih paket</option>
+
+                    {packageList.map((item) => (
+                      <option key={item.id} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Durasi */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-500">
+                    Durasi
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => openManage("duration")}
+                    className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                  >
+                    Kelola
+                  </button>
+                </div>
+
+                <select
+                  value={form.duration}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      duration: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                  required
+                >
+                  <option value="">Pilih durasi</option>
+
+                  {durationList.map((item) => (
+                    <option key={item.id} value={item.name}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Qty + Prices */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-500">
+                    Qty
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.quantity}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        quantity: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-500">
+                    Modal / pcs
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.purchase_price}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        purchase_price: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-500">
+                    Harga Jual / pcs
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.selling_price}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        selling_price: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300"
+                    required
+                  />
+                </div>
+
+              </div>
+
+              {/* Profit Preview */}
+              <div className="rounded-2xl bg-green-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-green-600">
+                    Estimasi Profit
+                  </span>
+
+                  <span className="text-sm font-bold text-green-600">
+                    {formatRupiah(
+                      (Number(form.selling_price || 0) -
+                        Number(form.purchase_price || 0)) *
+                        Number(form.quantity || 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment + Status */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-500">
+                    Payment
+                  </label>
+
+                  <select
+                    value={form.payment_method}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        payment_method: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                  >
+                    <option value="QRIS">QRIS</option>
+                    <option value="GoPay">GoPay</option>
+                    <option value="DANA">DANA</option>
+                    <option value="OVO">OVO</option>
+                    <option value="ShopeePay">ShopeePay</option>
+                    <option value="Transfer">Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-500">
+                    Status
+                  </label>
+
+                  <select
+                    value={form.order_status}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        order_status: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-300"
+                  >
+                    <option value="Completed">Completed</option>
+                    <option value="On Going">On Going</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Refunded">Refunded</option>
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-500">
                   Catatan
                 </label>
 
                 <textarea
-                  value={
-                    form.notes
-                  }
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      notes:
-                        e.target.value,
-                    })
-                  }
-                  placeholder="Catatan order..."
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
+                  placeholder="Catatan tambahan..."
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      notes: e.target.value,
+                    }))
+                  }
+                  className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
                 />
               </div>
 
-              {/* BUTTON */}
-
+              {/* Buttons */}
               <div className="flex gap-3 pt-2">
+
                 <button
                   type="button"
-                  onClick={
-                    closeForm
-                  }
+                  onClick={closeForm}
                   className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
                   Batal
@@ -2230,10 +1449,8 @@ export default function PenjualanPage() {
 
                 <button
                   type="submit"
-                  disabled={
-                    saving
-                  }
-                  className="flex-1 rounded-xl bg-pink-500 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-600 disabled:opacity-50"
+                  disabled={saving}
+                  className="flex-1 rounded-xl bg-pink-500 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving
                     ? "Menyimpan..."
@@ -2241,183 +1458,130 @@ export default function PenjualanPage() {
                     ? "Simpan Perubahan"
                     : "Tambah Order"}
                 </button>
+
               </div>
+
             </form>
           </div>
         </div>
       )}
 
       {/* =========================
-          MODAL KELOLA FH / PAKET / DURASI
-         ========================= */}
+          MASTER MANAGEMENT MODAL
+      ========================= */}
 
       {manageType && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
-            {/* HEADER */}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
 
-            <div className="flex items-center justify-between border-b border-pink-100 px-5 py-4">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between border-b border-pink-100 px-6 py-5">
+
               <div>
-                <h2 className="font-semibold text-gray-800">
+                <h2 className="text-lg font-bold text-gray-800">
                   {getMasterTitle()}
                 </h2>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  Tambah atau buang pilihan yang sudah tidak digunakan.
+                  Tambah, pilih, atau hapus data.
                 </p>
               </div>
 
               <button
-                onClick={
-                  closeManage
-                }
-                className="rounded-lg px-3 py-2 text-gray-400 hover:bg-gray-100"
+                onClick={closeManage}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100"
               >
                 ✕
               </button>
+
             </div>
 
-            {/* LIST */}
+            <div className="p-6">
 
-            <div className="max-h-[45vh] overflow-y-auto p-4">
-              {getMasterList()
-                .length ===
-              0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center">
-                  <p className="text-sm text-gray-400">
-                    Belum ada data.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* SELECT ALL */}
+              <div className="mb-4 flex gap-2">
 
-                  <div className="mb-3 flex items-center justify-between rounded-xl bg-pink-50 px-3 py-2">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={
-                          getMasterList()
-                            .length >
-                            0 &&
-                          selectedMasterIds.length ===
-                            getMasterList()
-                              .length
-                        }
-                        onChange={
-                          selectAllMaster
-                        }
-                        className="h-4 w-4 accent-pink-500"
-                      />
-
-                      <span className="text-xs font-medium text-pink-600">
-                        Pilih semua
-                      </span>
-                    </label>
-
-                    <span className="text-[10px] text-gray-400">
-                      {
-                        selectedMasterIds.length
-                      }{" "}
-                      dipilih
-                    </span>
-                  </div>
-
-                  {/* ITEMS */}
-
-                  <div className="space-y-2">
-                    {getMasterList().map(
-                      (item) => (
-                        <label
-                          key={
-                            item.id
-                          }
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition ${
-                            selectedMasterIds.includes(
-                              item.id
-                            )
-                              ? "border-pink-200 bg-pink-50"
-                              : "border-gray-100 hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMasterIds.includes(
-                              item.id
-                            )}
-                            onChange={() =>
-                              toggleMasterSelection(
-                                item.id
-                              )
-                            }
-                            className="h-4 w-4 accent-pink-500"
-                          />
-
-                          <span className="text-sm text-gray-700">
-                            {
-                              item.name
-                            }
-                          </span>
-                        </label>
-                      )
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* FOOTER */}
-
-            <div className="border-t border-gray-100 bg-gray-50 p-4">
-              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() =>
-                    addMasterItem(
-                      manageType
-                    )
+                    addMasterItem(manageType)
                   }
-                  className="flex-1 rounded-xl bg-pink-500 px-4 py-3 text-xs font-semibold text-white hover:bg-pink-600"
+                  className="flex-1 rounded-xl bg-pink-500 px-4 py-2.5 text-xs font-semibold text-white hover:bg-pink-600"
                 >
                   + Tambah
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    deleteSelectedMaster
-                  }
-                  disabled={
-                    deletingMaster ||
-                    selectedMasterIds.length ===
-                      0
-                  }
-                  className="flex-1 rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-500 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={selectAllMaster}
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  {selectedMasterIds.length ===
+                  getMasterList().length &&
+                  getMasterList().length > 0
+                    ? "Batal Pilih"
+                    : "Pilih Semua"}
+                </button>
+
+              </div>
+
+              <div className="max-h-72 overflow-y-auto rounded-2xl border border-gray-100">
+
+                {getMasterList().length === 0 ? (
+                  <div className="px-4 py-8 text-center text-xs text-gray-400">
+                    Belum ada data.
+                  </div>
+                ) : (
+                  getMasterList().map((item) => (
+                    <label
+                      key={item.id}
+                      className="flex cursor-pointer items-center gap-3 border-b border-gray-50 px-4 py-3 last:border-0 hover:bg-pink-50/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMasterIds.includes(
+                          item.id
+                        )}
+                        onChange={() =>
+                          toggleMasterSelection(item.id)
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-pink-500 focus:ring-pink-300"
+                      />
+
+                      <span className="text-sm text-gray-600">
+                        {item.name}
+                      </span>
+                    </label>
+                  ))
+                )}
+
+              </div>
+
+              {selectedMasterIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={deleteSelectedMaster}
+                  disabled={deletingMaster}
+                  className="mt-4 w-full rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-500 hover:bg-red-100 disabled:opacity-60"
                 >
                   {deletingMaster
-                    ? "Membuang..."
-                    : `🗑 Buang ${
-                        selectedMasterIds.length >
-                        0
-                          ? `(${selectedMasterIds.length})`
-                          : ""
-                      }`}
+                    ? "Menghapus..."
+                    : `Hapus ${selectedMasterIds.length} item`}
                 </button>
-              </div>
+              )}
 
               <button
                 type="button"
-                onClick={
-                  closeManage
-                }
-                className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-medium text-gray-500 hover:bg-gray-50"
+                onClick={closeManage}
+                className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-xs font-medium text-gray-500 hover:bg-gray-50"
               >
                 Selesai
               </button>
+
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
