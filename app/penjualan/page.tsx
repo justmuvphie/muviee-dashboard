@@ -23,6 +23,8 @@ type Product = {
   id: number;
   name: string;
   category: string;
+  purchase_price: number;
+  selling_price: number;
 };
 
 const fallbackProducts = [
@@ -100,17 +102,27 @@ export default function PenjualanPage() {
   async function getProducts() {
     const { data, error } = await supabase
       .from("products")
-      .select("id, name, category")
+      .select(
+        "id, name, category, purchase_price, selling_price"
+      )
       .order("name", { ascending: true });
 
-    if (!error && data) {
-      setProducts(data as Product[]);
+    if (error) {
+      console.error("Gagal mengambil produk:", error.message);
+      return;
     }
+
+    setProducts((data || []) as Product[]);
   }
 
   async function loadData() {
     setLoading(true);
-    await Promise.all([getSales(), getProducts()]);
+
+    await Promise.all([
+      getSales(),
+      getProducts(),
+    ]);
+
     setLoading(false);
   }
 
@@ -118,10 +130,16 @@ export default function PenjualanPage() {
     loadData();
   }, []);
 
-  const productNames =
+  const productOptions =
     products.length > 0
-      ? products.map((product) => product.name)
-      : fallbackProducts;
+      ? products
+      : fallbackProducts.map((name, index) => ({
+          id: index,
+          name,
+          category: "",
+          purchase_price: 0,
+          selling_price: 0,
+        }));
 
   // FILTER DATA
   const filteredSales = useMemo(() => {
@@ -150,7 +168,13 @@ export default function PenjualanPage() {
         matchesEndDate
       );
     });
-  }, [sales, search, statusFilter, startDate, endDate]);
+  }, [
+    sales,
+    search,
+    statusFilter,
+    startDate,
+    endDate,
+  ]);
 
   const totalOmzet = filteredSales.reduce(
     (total, sale) =>
@@ -161,7 +185,8 @@ export default function PenjualanPage() {
   );
 
   const totalProfit = filteredSales.reduce(
-    (total, sale) => total + Number(sale.profit || 0),
+    (total, sale) =>
+      total + Number(sale.profit || 0),
     0
   );
 
@@ -213,6 +238,7 @@ export default function PenjualanPage() {
         row
           .map((value) => {
             const text = String(value ?? "");
+
             return `"${text.replace(/"/g, '""')}"`;
           })
           .join(",")
@@ -232,7 +258,9 @@ export default function PenjualanPage() {
     const dateLabel =
       startDate || endDate
         ? `${startDate || "awal"}_sampai_${endDate || "sekarang"}`
-        : new Date().toISOString().split("T")[0];
+        : new Date()
+            .toISOString()
+            .split("T")[0];
 
     link.href = url;
     link.download = `rekapan_penjualan_${dateLabel}.csv`;
@@ -253,7 +281,12 @@ export default function PenjualanPage() {
 
   function openAddForm() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      order_date: new Date()
+        .toISOString()
+        .split("T")[0],
+    });
     setShowForm(true);
   }
 
@@ -263,16 +296,24 @@ export default function PenjualanPage() {
     setForm({
       order_date:
         sale.order_date ||
-        new Date().toISOString().split("T")[0],
+        new Date()
+          .toISOString()
+          .split("T")[0],
       buyer_name: sale.buyer_name || "",
       app_name: sale.app_name || "",
       package_name: sale.package_name || "",
       duration: sale.duration || "",
       quantity: String(sale.quantity || 1),
-      purchase_price: String(sale.purchase_price || ""),
-      selling_price: String(sale.selling_price || ""),
-      payment_method: sale.payment_method || "QRIS",
-      order_status: sale.order_status || "Completed",
+      purchase_price: String(
+        sale.purchase_price ?? ""
+      ),
+      selling_price: String(
+        sale.selling_price ?? ""
+      ),
+      payment_method:
+        sale.payment_method || "QRIS",
+      order_status:
+        sale.order_status || "Completed",
       notes: sale.notes || "",
     });
 
@@ -282,7 +323,38 @@ export default function PenjualanPage() {
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      order_date: new Date()
+        .toISOString()
+        .split("T")[0],
+    });
+  }
+
+  function handleProductChange(
+    productName: string
+  ) {
+    const selectedProduct = products.find(
+      (product) =>
+        product.name === productName
+    );
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      app_name: productName,
+
+      purchase_price: selectedProduct
+        ? String(
+            selectedProduct.purchase_price ?? 0
+          )
+        : "",
+
+      selling_price: selectedProduct
+        ? String(
+            selectedProduct.selling_price ?? 0
+          )
+        : "",
+    }));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -303,8 +375,45 @@ export default function PenjualanPage() {
       return;
     }
 
-    if (!form.purchase_price || !form.selling_price) {
-      alert("Harga modal dan harga jual wajib diisi.");
+    if (
+      form.purchase_price === "" ||
+      form.selling_price === ""
+    ) {
+      alert(
+        "Harga modal dan harga jual wajib diisi."
+      );
+      return;
+    }
+
+    const purchasePrice = Number(
+      form.purchase_price
+    );
+
+    const sellingPrice = Number(
+      form.selling_price
+    );
+
+    const quantity =
+      Number(form.quantity) || 1;
+
+    if (
+      isNaN(purchasePrice) ||
+      purchasePrice < 0
+    ) {
+      alert("Harga modal tidak valid.");
+      return;
+    }
+
+    if (
+      isNaN(sellingPrice) ||
+      sellingPrice < 0
+    ) {
+      alert("Harga jual tidak valid.");
+      return;
+    }
+
+    if (quantity < 1) {
+      alert("Quantity minimal 1.");
       return;
     }
 
@@ -314,13 +423,16 @@ export default function PenjualanPage() {
       order_date: form.order_date,
       buyer_name: form.buyer_name.trim(),
       app_name: form.app_name,
-      package_name: form.package_name.trim(),
+      package_name:
+        form.package_name.trim(),
       duration: form.duration.trim(),
-      quantity: Number(form.quantity) || 1,
-      purchase_price: Number(form.purchase_price) || 0,
-      selling_price: Number(form.selling_price) || 0,
-      payment_method: form.payment_method,
-      order_status: form.order_status,
+      quantity,
+      purchase_price: purchasePrice,
+      selling_price: sellingPrice,
+      payment_method:
+        form.payment_method,
+      order_status:
+        form.order_status,
       notes: form.notes.trim(),
     };
 
@@ -342,7 +454,10 @@ export default function PenjualanPage() {
     }
 
     if (error) {
-      alert("Gagal menyimpan: " + error.message);
+      alert(
+        "Gagal menyimpan: " +
+          error.message
+      );
     } else {
       alert(
         editingId
@@ -364,11 +479,13 @@ export default function PenjualanPage() {
 
     if (!confirmed) return;
 
-    const { data: warrantyData, error: warrantyCheckError } =
-      await supabase
-        .from("warranties")
-        .select("id")
-        .eq("sale_id", sale.id);
+    const {
+      data: warrantyData,
+      error: warrantyCheckError,
+    } = await supabase
+      .from("warranties")
+      .select("id")
+      .eq("sale_id", sale.id);
 
     if (warrantyCheckError) {
       alert(
@@ -378,7 +495,10 @@ export default function PenjualanPage() {
       return;
     }
 
-    if (warrantyData && warrantyData.length > 0) {
+    if (
+      warrantyData &&
+      warrantyData.length > 0
+    ) {
       alert(
         "Order ini masih memiliki data garansi. Hapus data garansinya terlebih dahulu."
       );
@@ -391,7 +511,10 @@ export default function PenjualanPage() {
       .eq("id", sale.id);
 
     if (error) {
-      alert("Gagal menghapus: " + error.message);
+      alert(
+        "Gagal menghapus: " +
+          error.message
+      );
       return;
     }
 
@@ -404,6 +527,7 @@ export default function PenjualanPage() {
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-pink-200 border-t-pink-500" />
+
           <p className="text-sm text-gray-400">
             Loading penjualan...
           </p>
@@ -478,7 +602,9 @@ export default function PenjualanPage() {
             type="text"
             placeholder="Cari buyer, aplikasi, atau paket..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
             className="rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400"
           />
 
@@ -489,11 +615,25 @@ export default function PenjualanPage() {
             }
             className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
           >
-            <option value="All">Semua Status</option>
-            <option value="Completed">Completed</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-            <option value="Refunded">Refunded</option>
+            <option value="All">
+              Semua Status
+            </option>
+
+            <option value="Completed">
+              Completed
+            </option>
+
+            <option value="Pending">
+              Pending
+            </option>
+
+            <option value="Cancelled">
+              Cancelled
+            </option>
+
+            <option value="Refunded">
+              Refunded
+            </option>
           </select>
 
           <div>
@@ -505,7 +645,9 @@ export default function PenjualanPage() {
               type="date"
               value={startDate}
               onChange={(e) =>
-                setStartDate(e.target.value)
+                setStartDate(
+                  e.target.value
+                )
               }
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
             />
@@ -519,9 +661,13 @@ export default function PenjualanPage() {
             <input
               type="date"
               value={endDate}
-              min={startDate || undefined}
+              min={
+                startDate || undefined
+              }
               onChange={(e) =>
-                setEndDate(e.target.value)
+                setEndDate(
+                  e.target.value
+                )
               }
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
             />
@@ -559,7 +705,9 @@ export default function PenjualanPage() {
 
         {filteredSales.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <div className="text-4xl">🛒</div>
+            <div className="text-4xl">
+              🛒
+            </div>
 
             <p className="mt-3 font-medium text-gray-600">
               Belum ada data
@@ -617,110 +765,122 @@ export default function PenjualanPage() {
               </thead>
 
               <tbody>
-                {filteredSales.map((sale) => (
-                  <tr
-                    key={sale.id}
-                    className="border-b border-gray-50 last:border-0 hover:bg-pink-50/30"
-                  >
-                    <td className="px-6 py-4 text-gray-500">
-                      {sale.order_date
-                        ? new Date(
-                            `${sale.order_date}T00:00:00`
-                          ).toLocaleDateString("id-ID")
-                        : "-"}
-                    </td>
+                {filteredSales.map(
+                  (sale) => (
+                    <tr
+                      key={sale.id}
+                      className="border-b border-gray-50 last:border-0 hover:bg-pink-50/30"
+                    >
+                      <td className="px-6 py-4 text-gray-500">
+                        {sale.order_date
+                          ? new Date(
+                              `${sale.order_date}T00:00:00`
+                            ).toLocaleDateString(
+                              "id-ID"
+                            )
+                          : "-"}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <p className="font-medium text-gray-700">
-                        {sale.buyer_name}
-                      </p>
-
-                      {sale.notes && (
-                        <p className="mt-1 max-w-[150px] truncate text-[10px] text-gray-400">
-                          {sale.notes}
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-gray-700">
+                          {sale.buyer_name}
                         </p>
-                      )}
-                    </td>
 
-                    <td className="px-4 py-4 font-medium text-gray-700">
-                      {sale.app_name}
-                    </td>
+                        {sale.notes && (
+                          <p className="mt-1 max-w-[150px] truncate text-[10px] text-gray-400">
+                            {sale.notes}
+                          </p>
+                        )}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <p className="text-gray-600">
-                        {sale.package_name}
-                      </p>
+                      <td className="px-4 py-4 font-medium text-gray-700">
+                        {sale.app_name}
+                      </td>
 
-                      <p className="text-[10px] text-gray-400">
-                        {sale.duration}
-                      </p>
-                    </td>
+                      <td className="px-4 py-4">
+                        <p className="text-gray-600">
+                          {sale.package_name}
+                        </p>
 
-                    <td className="px-4 py-4 text-gray-600">
-                      {sale.quantity}
-                    </td>
+                        <p className="text-[10px] text-gray-400">
+                          {sale.duration}
+                        </p>
+                      </td>
 
-                    <td className="px-4 py-4 text-gray-500">
-                      {formatRupiah(
-                        Number(
-                          sale.purchase_price || 0
-                        )
-                      )}
-                    </td>
+                      <td className="px-4 py-4 text-gray-600">
+                        {sale.quantity}
+                      </td>
 
-                    <td className="px-4 py-4 font-medium text-gray-700">
-                      {formatRupiah(
-                        Number(
-                          sale.selling_price || 0
-                        )
-                      )}
-                    </td>
+                      <td className="px-4 py-4 text-gray-500">
+                        {formatRupiah(
+                          Number(
+                            sale.purchase_price ||
+                              0
+                          )
+                        )}
+                      </td>
 
-                    <td className="px-4 py-4 font-semibold text-green-600">
-                      {formatRupiah(
-                        Number(sale.profit || 0)
-                      )}
-                    </td>
+                      <td className="px-4 py-4 font-medium text-gray-700">
+                        {formatRupiah(
+                          Number(
+                            sale.selling_price ||
+                              0
+                          )
+                        )}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-medium ${
-                          sale.order_status ===
-                          "Completed"
-                            ? "bg-green-50 text-green-600"
-                            : sale.order_status ===
-                              "Cancelled"
-                            ? "bg-red-50 text-red-500"
-                            : "bg-yellow-50 text-yellow-600"
-                        }`}
-                      >
-                        {sale.order_status}
-                      </span>
-                    </td>
+                      <td className="px-4 py-4 font-semibold text-green-600">
+                        {formatRupiah(
+                          Number(
+                            sale.profit || 0
+                          )
+                        )}
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() =>
-                            openEditForm(sale)
-                          }
-                          className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-500 hover:bg-blue-100"
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-[10px] font-medium ${
+                            sale.order_status ===
+                            "Completed"
+                              ? "bg-green-50 text-green-600"
+                              : sale.order_status ===
+                                "Cancelled"
+                              ? "bg-red-50 text-red-500"
+                              : "bg-yellow-50 text-yellow-600"
+                          }`}
                         >
-                          Edit
-                        </button>
+                          {sale.order_status}
+                        </span>
+                      </td>
 
-                        <button
-                          onClick={() =>
-                            deleteSale(sale)
-                          }
-                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-100"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              openEditForm(
+                                sale
+                              )
+                            }
+                            className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-500 hover:bg-blue-100"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              deleteSale(
+                                sale
+                              )
+                            }
+                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-100"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
@@ -810,11 +970,9 @@ export default function PenjualanPage() {
                   <select
                     value={form.app_name}
                     onChange={(e) =>
-                      setForm({
-                        ...form,
-                        app_name:
-                          e.target.value,
-                      })
+                      handleProductChange(
+                        e.target.value
+                      )
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
                     required
@@ -823,17 +981,25 @@ export default function PenjualanPage() {
                       Pilih aplikasi
                     </option>
 
-                    {productNames.map(
+                    {productOptions.map(
                       (product) => (
                         <option
-                          key={product}
-                          value={product}
+                          key={`${product.id}-${product.name}`}
+                          value={product.name}
                         >
-                          {product}
+                          {product.name}
                         </option>
                       )
                     )}
                   </select>
+
+                  {products.length > 0 &&
+                    form.app_name && (
+                      <p className="mt-2 text-[11px] text-pink-400">
+                        Harga otomatis diambil
+                        dari data Produk ♡
+                      </p>
+                    )}
                 </div>
 
                 <div>
@@ -909,23 +1075,37 @@ export default function PenjualanPage() {
                     Harga Modal / Firsthand
                   </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      form.purchase_price
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        purchase_price:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="15000"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                      Rp
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      value={
+                        form.purchase_price
+                      }
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          purchase_price:
+                            e.target.value,
+                        })
+                      }
+                      placeholder="15000"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
+                      required
+                    />
+                  </div>
+
+                  {form.app_name &&
+                    products.length > 0 && (
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        Bisa diubah manual untuk
+                        order tertentu.
+                      </p>
+                    )}
                 </div>
 
                 <div>
@@ -933,23 +1113,37 @@ export default function PenjualanPage() {
                     Harga Jual
                   </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      form.selling_price
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        selling_price:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="35000"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                      Rp
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      value={
+                        form.selling_price
+                      }
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          selling_price:
+                            e.target.value,
+                        })
+                      }
+                      placeholder="35000"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 pl-11 text-sm outline-none focus:border-pink-400"
+                      required
+                    />
+                  </div>
+
+                  {form.app_name &&
+                    products.length > 0 && (
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        Bisa diubah manual untuk
+                        order tertentu.
+                      </p>
+                    )}
                 </div>
               </div>
 
@@ -1001,10 +1195,21 @@ export default function PenjualanPage() {
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
                   >
-                    <option>Completed</option>
-                    <option>Pending</option>
-                    <option>Cancelled</option>
-                    <option>Refunded</option>
+                    <option>
+                      Completed
+                    </option>
+
+                    <option>
+                      Pending
+                    </option>
+
+                    <option>
+                      Cancelled
+                    </option>
+
+                    <option>
+                      Refunded
+                    </option>
                   </select>
                 </div>
               </div>
@@ -1020,7 +1225,8 @@ export default function PenjualanPage() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      notes: e.target.value,
+                      notes:
+                        e.target.value,
                     })
                   }
                   placeholder="Catatan order..."
@@ -1030,26 +1236,48 @@ export default function PenjualanPage() {
               </div>
 
               {/* Profit Preview */}
-              {form.purchase_price &&
-                form.selling_price && (
+              {form.purchase_price !== "" &&
+                form.selling_price !== "" && (
                   <div className="rounded-xl bg-green-50 p-4">
-                    <p className="text-xs text-gray-400">
-                      Estimasi profit
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-400">
+                          Estimasi profit
+                        </p>
 
-                    <p className="mt-1 text-lg font-bold text-green-600">
-                      {formatRupiah(
-                        (Number(
-                          form.selling_price
-                        ) -
-                          Number(
-                            form.purchase_price
-                          )) *
-                          Number(
-                            form.quantity || 1
-                          )
-                      )}
-                    </p>
+                        <p className="mt-1 text-lg font-bold text-green-600">
+                          {formatRupiah(
+                            (Number(
+                              form.selling_price
+                            ) -
+                              Number(
+                                form.purchase_price
+                              )) *
+                              Number(
+                                form.quantity ||
+                                  1
+                              )
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400">
+                          Per item
+                        </p>
+
+                        <p className="mt-1 text-xs font-semibold text-green-600">
+                          {formatRupiah(
+                            Number(
+                              form.selling_price
+                            ) -
+                              Number(
+                                form.purchase_price
+                              )
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
