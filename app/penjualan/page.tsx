@@ -320,8 +320,7 @@ export default function PenjualanPage() {
       const matchesStatus =
         statusFilter === "Semua" || sale.order_status === statusFilter;
 
-      const matchesDate =
-        !dateFilter || sale.order_date === dateFilter;
+      const matchesDate = !dateFilter || sale.order_date === dateFilter;
 
       return matchesSearch && matchesStatus && matchesDate;
     });
@@ -619,10 +618,6 @@ export default function PenjualanPage() {
     }
   };
 
-  // =========================
-  // PROFIT PREVIEW
-  // =========================
-
   const previewProfit =
     ((Number(form.selling_price) || 0) -
       (Number(form.purchase_price) || 0)) *
@@ -631,26 +626,26 @@ export default function PenjualanPage() {
   return (
     <div className="min-h-screen bg-[#fffafd]">
       {/* HEADER */}
-      <div className="border-b border-pink-100 bg-white px-4 py-5 sm:px-6">
+      <div className="border-b border-pink-100 bg-white px-4 py-4 sm:px-6 sm:py-5">
         <div className="mx-auto max-w-[1500px]">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-pink-400">
+              <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-pink-400 sm:text-[11px] sm:tracking-[0.2em]">
                 manage your orders ♡
               </p>
 
-              <h1 className="mt-1 text-2xl font-semibold text-gray-800">
+              <h1 className="mt-1 text-xl font-semibold text-gray-800 sm:text-2xl">
                 Penjualan
               </h1>
 
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-[10px] text-gray-400 sm:text-xs">
                 Kelola semua rekapan pembelian dan profit kamu.
               </p>
             </div>
 
             <button
               onClick={openAddForm}
-              className="rounded-xl bg-pink-500 px-4 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-pink-600"
+              className="w-full rounded-xl bg-pink-500 px-4 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-pink-600 sm:w-auto"
             >
               + Tambah Order
             </button>
@@ -658,65 +653,72 @@ export default function PenjualanPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+      <main className="mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-5">
         {/* SUMMARY */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-pink-100 bg-white p-4">
-            <p className="text-[11px] text-gray-400">Total Order</p>
-            <p className="mt-1 text-xl font-semibold text-gray-800">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <div className="rounded-2xl border border-pink-100 bg-white p-3 sm:p-4">
+            <p className="text-[9px] text-gray-400 sm:text-[11px]">
+              Total Order
+            </p>
+
+            <p className="mt-1 text-base font-semibold text-gray-800 sm:text-xl">
               {totalOrder}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-pink-100 bg-white p-4">
-            <p className="text-[11px] text-gray-400">Omzet</p>
-            <p className="mt-1 text-xl font-semibold text-gray-800">
+          <div className="rounded-2xl border border-pink-100 bg-white p-3 sm:p-4">
+            <p className="text-[9px] text-gray-400 sm:text-[11px]">Omzet</p>
+
+            <p className="mt-1 truncate text-[12px] font-semibold text-gray-800 sm:text-xl">
               {formatRupiah(totalOmzet)}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-pink-100 bg-white p-4">
-            <p className="text-[11px] text-gray-400">Profit</p>
-            <p className="mt-1 text-xl font-semibold text-pink-500">
+          <div className="rounded-2xl border border-pink-100 bg-white p-3 sm:p-4">
+            <p className="text-[9px] text-gray-400 sm:text-[11px]">Profit</p>
+
+            <p className="mt-1 truncate text-[12px] font-semibold text-pink-500 sm:text-xl">
               {formatRupiah(totalProfit)}
             </p>
           </div>
         </div>
 
         {/* FILTER */}
-        <div className="mt-5 rounded-2xl border border-pink-100 bg-white p-4">
-          <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="mt-4 rounded-2xl border border-pink-100 bg-white p-3 sm:mt-5 sm:p-4">
+          <div className="flex flex-col gap-2.5 sm:gap-3 lg:flex-row">
             <div className="flex-1">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Cari buyer, aplikasi, akun, paket..."
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-pink-300 focus:bg-white"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-xs text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-pink-300 focus:bg-white sm:px-4"
               />
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300"
-            >
-              <option value="Semua">Semua Status</option>
-              <option value="Completed">Completed</option>
-              <option value="Pending">Pending</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
+            <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-3">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300 sm:px-4"
+              >
+                <option value="Semua">Semua Status</option>
+                <option value="Completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
 
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300"
-            />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300 sm:px-4"
+              />
+            </div>
 
             <button
               onClick={exportCSV}
-              className="rounded-xl border border-pink-200 bg-pink-50 px-4 py-2.5 text-xs font-medium text-pink-500 transition hover:bg-pink-100"
+              className="w-full rounded-xl border border-pink-200 bg-pink-50 px-4 py-2.5 text-xs font-medium text-pink-500 transition hover:bg-pink-100 sm:w-auto"
             >
               Export CSV
             </button>
@@ -724,44 +726,44 @@ export default function PenjualanPage() {
         </div>
 
         {/* TABLE */}
-        <div className="mt-5 overflow-hidden rounded-2xl border border-pink-100 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-pink-100 bg-white sm:mt-5">
+          <div className="overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[820px] text-left">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/80">
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Tanggal
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Buyer
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Aplikasi
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Paket
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Durasi
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Qty
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Profit
                   </th>
 
-                  <th className="whitespace-nowrap px-3 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="whitespace-nowrap px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-3 sm:text-[11px]">
                     Status
                   </th>
 
-                  <th className="sticky right-0 z-10 whitespace-nowrap bg-gray-50/95 px-4 py-3 text-[11px] font-medium text-gray-400">
+                  <th className="sticky right-0 z-10 whitespace-nowrap bg-gray-50/95 px-2.5 py-3 text-[10px] font-medium text-gray-400 sm:px-4 sm:text-[11px]">
                     Aksi
                   </th>
                 </tr>
@@ -793,14 +795,14 @@ export default function PenjualanPage() {
                       className="border-b border-gray-50 transition hover:bg-pink-50/30"
                     >
                       {/* TANGGAL */}
-                      <td className="whitespace-nowrap px-3 py-3 align-top text-xs text-gray-500">
+                      <td className="whitespace-nowrap px-2.5 py-3 align-top text-[10px] text-gray-500 sm:px-3 sm:text-xs">
                         {sale.order_date}
                       </td>
 
                       {/* BUYER + CATATAN */}
-                      <td className="max-w-[190px] px-3 py-3 align-top">
+                      <td className="max-w-[170px] px-2.5 py-3 align-top sm:max-w-[190px] sm:px-3">
                         <div
-                          className="truncate text-xs font-medium text-gray-700"
+                          className="truncate text-[11px] font-medium text-gray-700 sm:text-xs"
                           title={sale.buyer_name}
                         >
                           {sale.buyer_name}
@@ -808,7 +810,7 @@ export default function PenjualanPage() {
 
                         {sale.notes && (
                           <div
-                            className="mt-0.5 max-w-[190px] truncate text-[10px] text-gray-400"
+                            className="mt-0.5 max-w-[170px] truncate text-[9px] text-gray-400 sm:max-w-[190px] sm:text-[10px]"
                             title={sale.notes}
                           >
                             ↳ {sale.notes}
@@ -817,9 +819,9 @@ export default function PenjualanPage() {
                       </td>
 
                       {/* APLIKASI + FH */}
-                      <td className="max-w-[150px] px-3 py-3 align-top">
+                      <td className="max-w-[140px] px-2.5 py-3 align-top sm:max-w-[150px] sm:px-3">
                         <div
-                          className="truncate text-xs text-gray-600"
+                          className="truncate text-[11px] text-gray-600 sm:text-xs"
                           title={sale.app_name}
                         >
                           {sale.app_name}
@@ -827,7 +829,7 @@ export default function PenjualanPage() {
 
                         {sale.fh && (
                           <div
-                            className="mt-0.5 truncate text-[10px] text-gray-400"
+                            className="mt-0.5 truncate text-[9px] text-gray-400 sm:text-[10px]"
                             title={sale.fh}
                           >
                             FH · {sale.fh}
@@ -836,9 +838,9 @@ export default function PenjualanPage() {
                       </td>
 
                       {/* PAKET */}
-                      <td className="max-w-[120px] px-3 py-3 align-top">
+                      <td className="max-w-[110px] px-2.5 py-3 align-top sm:max-w-[120px] sm:px-3">
                         <div
-                          className="truncate text-xs text-gray-600"
+                          className="truncate text-[11px] text-gray-600 sm:text-xs"
                           title={sale.package_name || ""}
                         >
                           {sale.package_name || "-"}
@@ -846,26 +848,26 @@ export default function PenjualanPage() {
                       </td>
 
                       {/* DURASI */}
-                      <td className="whitespace-nowrap px-3 py-3 align-top text-xs text-gray-500">
+                      <td className="whitespace-nowrap px-2.5 py-3 align-top text-[10px] text-gray-500 sm:px-3 sm:text-xs">
                         {sale.duration || "-"}
                       </td>
 
                       {/* QTY */}
-                      <td className="px-3 py-3 align-top text-xs text-gray-500">
+                      <td className="px-2.5 py-3 align-top text-[10px] text-gray-500 sm:px-3 sm:text-xs">
                         {sale.quantity}
                       </td>
 
                       {/* PROFIT */}
-                      <td className="whitespace-nowrap px-3 py-3 align-top">
-                        <span className="text-xs font-medium text-pink-500">
+                      <td className="whitespace-nowrap px-2.5 py-3 align-top sm:px-3">
+                        <span className="text-[10px] font-medium text-pink-500 sm:text-xs">
                           {formatRupiah(Number(sale.profit || 0))}
                         </span>
                       </td>
 
                       {/* STATUS */}
-                      <td className="px-3 py-3 align-top">
+                      <td className="px-2.5 py-3 align-top sm:px-3">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                          className={`inline-flex rounded-full px-2 py-1 text-[9px] font-medium sm:px-2.5 sm:text-[10px] ${
                             sale.order_status === "Completed"
                               ? "bg-green-50 text-green-500"
                               : sale.order_status === "Pending"
@@ -878,25 +880,25 @@ export default function PenjualanPage() {
                       </td>
 
                       {/* AKSI STICKY */}
-                      <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-4 py-3 shadow-[-4px_0_8px_-6px_rgba(0,0,0,0.15)]">
-                        <div className="flex gap-1.5">
+                      <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-2.5 py-3 shadow-[-4px_0_8px_-6px_rgba(0,0,0,0.15)] sm:px-4">
+                        <div className="flex gap-1 sm:gap-1.5">
                           <button
                             onClick={() => openAccountDetail(sale)}
-                            className="rounded-lg bg-pink-50 px-2.5 py-1.5 text-[10px] font-medium text-pink-500 hover:bg-pink-100"
+                            className="rounded-lg bg-pink-50 px-2 py-1.5 text-[9px] font-medium text-pink-500 hover:bg-pink-100 sm:px-2.5 sm:text-[10px]"
                           >
                             Detail
                           </button>
 
                           <button
                             onClick={() => openEditForm(sale)}
-                            className="rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-medium text-blue-500 hover:bg-blue-100"
+                            className="rounded-lg bg-blue-50 px-2 py-1.5 text-[9px] font-medium text-blue-500 hover:bg-blue-100 sm:px-2.5 sm:text-[10px]"
                           >
                             Edit
                           </button>
 
                           <button
                             onClick={() => deleteSale(sale)}
-                            className="rounded-lg bg-red-50 px-2.5 py-1.5 text-[10px] font-medium text-red-500 hover:bg-red-100"
+                            className="rounded-lg bg-red-50 px-2 py-1.5 text-[9px] font-medium text-red-500 hover:bg-red-100 sm:px-2.5 sm:text-[10px]"
                           >
                             Hapus
                           </button>
@@ -909,29 +911,36 @@ export default function PenjualanPage() {
             </table>
           </div>
         </div>
+
+        {/* MOBILE SCROLL HINT */}
+        {!loading && filteredSales.length > 0 && (
+          <p className="mt-2 text-center text-[9px] text-gray-300 sm:hidden">
+            Geser tabel ke kiri/kanan untuk melihat data lainnya ♡
+          </p>
+        )}
       </main>
 
       {/* =========================
           ADD / EDIT MODAL
       ========================= */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-            {/* MODAL HEADER */}
-            <div className="sticky top-0 flex items-center justify-between border-b border-pink-100 bg-white px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <div className="flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-3xl">
+            {/* HEADER */}
+            <div className="sticky top-0 flex items-center justify-between border-b border-pink-100 bg-white px-4 py-4 sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">
+                <h2 className="text-base font-semibold text-gray-800 sm:text-lg">
                   {editingSale ? "Edit Order" : "Tambah Order"}
                 </h2>
 
-                <p className="mt-0.5 text-[11px] text-gray-400">
+                <p className="mt-0.5 text-[10px] text-gray-400 sm:text-[11px]">
                   Isi detail transaksi kamu ♡
                 </p>
               </div>
 
               <button
                 onClick={closeForm}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
               >
                 ×
               </button>
@@ -940,12 +949,12 @@ export default function PenjualanPage() {
             {/* FORM */}
             <form
               onSubmit={handleSubmit}
-              className="overflow-y-auto px-6 py-5"
+              className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5"
             >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
                 {/* DATE */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Tanggal
                   </label>
 
@@ -964,7 +973,7 @@ export default function PenjualanPage() {
 
                 {/* BUYER */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Buyer
                   </label>
 
@@ -984,7 +993,7 @@ export default function PenjualanPage() {
 
                 {/* APP */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Aplikasi
                   </label>
 
@@ -1006,14 +1015,14 @@ export default function PenjualanPage() {
                 {/* FH */}
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
-                    <label className="text-[11px] font-medium text-gray-500">
+                    <label className="text-[10px] font-medium text-gray-500 sm:text-[11px]">
                       FH
                     </label>
 
                     <button
                       type="button"
                       onClick={() => openManage("fh")}
-                      className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                      className="text-[9px] font-medium text-pink-500 hover:text-pink-600 sm:text-[10px]"
                     >
                       Kelola
                     </button>
@@ -1042,14 +1051,14 @@ export default function PenjualanPage() {
                 {/* PACKAGE */}
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
-                    <label className="text-[11px] font-medium text-gray-500">
+                    <label className="text-[10px] font-medium text-gray-500 sm:text-[11px]">
                       Paket
                     </label>
 
                     <button
                       type="button"
                       onClick={() => openManage("package")}
-                      className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                      className="text-[9px] font-medium text-pink-500 hover:text-pink-600 sm:text-[10px]"
                     >
                       Kelola
                     </button>
@@ -1078,14 +1087,14 @@ export default function PenjualanPage() {
                 {/* DURATION */}
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
-                    <label className="text-[11px] font-medium text-gray-500">
+                    <label className="text-[10px] font-medium text-gray-500 sm:text-[11px]">
                       Durasi
                     </label>
 
                     <button
                       type="button"
                       onClick={() => openManage("duration")}
-                      className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                      className="text-[9px] font-medium text-pink-500 hover:text-pink-600 sm:text-[10px]"
                     >
                       Kelola
                     </button>
@@ -1114,7 +1123,7 @@ export default function PenjualanPage() {
 
               {/* ACCOUNT DETAIL */}
               <div className="mt-4">
-                <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                   Detail Akun
                 </label>
 
@@ -1129,7 +1138,6 @@ export default function PenjualanPage() {
                   rows={5}
                   placeholder={`Tempel detail akun di sini...
 
-Contoh:
 email: xxx@gmail.com
 password: xxxxx
 profile: 2
@@ -1137,16 +1145,16 @@ pin: 1234`}
                   className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-xs leading-5 text-gray-700 outline-none placeholder:text-gray-400 focus:border-pink-300 focus:bg-white"
                 />
 
-                <p className="mt-1.5 text-[10px] text-gray-400">
+                <p className="mt-1.5 text-[9px] text-gray-400 sm:text-[10px]">
                   Bisa isi bebas dan nanti bisa langsung dicopy dari tombol
                   Detail.
                 </p>
               </div>
 
               {/* QTY + PRICES */}
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3 sm:gap-4">
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Qty
                   </label>
 
@@ -1165,7 +1173,7 @@ pin: 1234`}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Modal
                   </label>
 
@@ -1185,7 +1193,7 @@ pin: 1234`}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Harga Jual
                   </label>
 
@@ -1205,10 +1213,10 @@ pin: 1234`}
                 </div>
               </div>
 
-              {/* PROFIT PREVIEW */}
-              <div className="mt-4 rounded-2xl border border-pink-100 bg-pink-50/50 p-4">
+              {/* PROFIT */}
+              <div className="mt-4 rounded-2xl border border-pink-100 bg-pink-50/50 p-3.5 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-gray-500">
+                  <span className="text-[10px] text-gray-500 sm:text-[11px]">
                     Estimasi Profit
                   </span>
 
@@ -1219,9 +1227,9 @@ pin: 1234`}
               </div>
 
               {/* PAYMENT + STATUS */}
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Payment
                   </label>
 
@@ -1247,7 +1255,7 @@ pin: 1234`}
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                  <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                     Status
                   </label>
 
@@ -1270,7 +1278,7 @@ pin: 1234`}
 
               {/* NOTES */}
               <div className="mt-4">
-                <label className="mb-1.5 block text-[11px] font-medium text-gray-500">
+                <label className="mb-1.5 block text-[10px] font-medium text-gray-500 sm:text-[11px]">
                   Catatan
                 </label>
 
@@ -1289,7 +1297,7 @@ pin: 1234`}
               </div>
 
               {/* BUTTON */}
-              <div className="mt-5 flex gap-3">
+              <div className="mt-5 flex gap-2.5 pb-1 sm:gap-3">
                 <button
                   type="button"
                   onClick={closeForm}
@@ -1319,15 +1327,15 @@ pin: 1234`}
           DETAIL AKUN MODAL
       ========================= */}
       {selectedAccountSale && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-pink-100 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
+        <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-pink-100 px-4 py-4 sm:px-6">
+              <div className="min-w-0 pr-3">
+                <h2 className="text-base font-semibold text-gray-800 sm:text-lg">
                   Detail Akun
                 </h2>
 
-                <p className="mt-0.5 text-[11px] text-gray-400">
+                <p className="mt-0.5 truncate text-[10px] text-gray-400 sm:text-[11px]">
                   {selectedAccountSale.app_name} ·{" "}
                   {selectedAccountSale.buyer_name}
                 </p>
@@ -1335,21 +1343,21 @@ pin: 1234`}
 
               <button
                 onClick={closeAccountDetail}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
               >
                 ×
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">
+            <div className="p-4 sm:p-6">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3.5 sm:p-4">
+                <pre className="max-h-[55vh] overflow-y-auto whitespace-pre-wrap break-words text-xs leading-6 text-gray-700 sm:text-sm">
                   {selectedAccountSale.account_details ||
                     "Belum ada detail akun."}
                 </pre>
               </div>
 
-              <div className="mt-4 flex gap-3">
+              <div className="mt-3 flex gap-2.5 sm:mt-4 sm:gap-3">
                 <button
                   onClick={copyAccountDetail}
                   disabled={!selectedAccountSale.account_details}
@@ -1360,7 +1368,7 @@ pin: 1234`}
 
                 <button
                   onClick={closeAccountDetail}
-                  className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-xs font-medium text-gray-500 hover:bg-gray-50"
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-medium text-gray-500 hover:bg-gray-50 sm:px-5"
                 >
                   Tutup
                 </button>
@@ -1374,15 +1382,15 @@ pin: 1234`}
           MASTER MANAGEMENT MODAL
       ========================= */}
       {manageType && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-pink-100 px-6 py-4">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-pink-100 px-4 py-4 sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">
+                <h2 className="text-base font-semibold text-gray-800 sm:text-lg">
                   {getMasterTitle()}
                 </h2>
 
-                <p className="mt-0.5 text-[11px] text-gray-400">
+                <p className="mt-0.5 text-[10px] text-gray-400 sm:text-[11px]">
                   Tambah atau hapus pilihan.
                 </p>
               </div>
@@ -1395,7 +1403,7 @@ pin: 1234`}
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* ADD */}
               <div className="flex gap-2">
                 <input
@@ -1416,7 +1424,7 @@ pin: 1234`}
                   type="button"
                   onClick={addMasterItem}
                   disabled={savingMaster || !masterName.trim()}
-                  className="rounded-xl bg-pink-500 px-4 py-2.5 text-xs font-medium text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl bg-pink-500 px-3 py-2.5 text-xs font-medium text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                 >
                   Tambah
                 </button>
@@ -1428,7 +1436,7 @@ pin: 1234`}
                   <button
                     type="button"
                     onClick={selectAllMaster}
-                    className="text-[10px] font-medium text-pink-500 hover:text-pink-600"
+                    className="text-[9px] font-medium text-pink-500 hover:text-pink-600 sm:text-[10px]"
                   >
                     {selectedMasterIds.length === getMasterList().length &&
                     getMasterList().length > 0
@@ -1440,14 +1448,14 @@ pin: 1234`}
                     <button
                       type="button"
                       onClick={deleteSelectedMaster}
-                      className="text-[10px] font-medium text-red-500 hover:text-red-600"
+                      className="text-[9px] font-medium text-red-500 hover:text-red-600 sm:text-[10px]"
                     >
                       Hapus terpilih ({selectedMasterIds.length})
                     </button>
                   )}
                 </div>
 
-                <div className="max-h-64 overflow-y-auto rounded-2xl border border-gray-100">
+                <div className="max-h-56 overflow-y-auto rounded-2xl border border-gray-100 sm:max-h-64">
                   {getMasterList().length === 0 ? (
                     <div className="px-4 py-8 text-center text-xs text-gray-400">
                       Belum ada data.
