@@ -18,6 +18,7 @@ type Sale = {
   payment_method: string | null;
   order_status: string | null;
   notes: string | null;
+  account_details: string | null;
 };
 
 type Product = {
@@ -56,6 +57,7 @@ const emptyForm = {
   payment_method: "QRIS",
   order_status: "Completed",
   notes: "",
+  account_details: "",
 };
 
 export default function PenjualanPage() {
@@ -83,6 +85,9 @@ export default function PenjualanPage() {
   const [selectedMasterIds, setSelectedMasterIds] = useState<string[]>([]);
   const [deletingMaster, setDeletingMaster] = useState(false);
 
+  const [detailSale, setDetailSale] = useState<Sale | null>(null);
+  const [copiedAccount, setCopiedAccount] = useState(false);
+
   /* =========================
      LOAD DATA
   ========================= */
@@ -105,7 +110,8 @@ export default function PenjualanPage() {
         profit,
         payment_method,
         order_status,
-        notes
+        notes,
+        account_details
       `
       )
       .order("order_date", { ascending: false })
@@ -435,7 +441,9 @@ export default function PenjualanPage() {
         sale.app_name?.toLowerCase().includes(keyword) ||
         sale.fh?.toLowerCase().includes(keyword) ||
         sale.package_name?.toLowerCase().includes(keyword) ||
-        sale.duration?.toLowerCase().includes(keyword);
+        sale.duration?.toLowerCase().includes(keyword) ||
+        sale.notes?.toLowerCase().includes(keyword) ||
+        sale.account_details?.toLowerCase().includes(keyword);
 
       const matchesStatus =
         statusFilter === "All" || sale.order_status === statusFilter;
@@ -457,7 +465,9 @@ export default function PenjualanPage() {
 
   const totalOmzet = useMemo(() => {
     return filteredSales.reduce(
-      (total, sale) => total + Number(sale.selling_price) * Number(sale.quantity),
+      (total, sale) =>
+        total +
+        Number(sale.selling_price) * Number(sale.quantity),
       0
     );
   }, [filteredSales]);
@@ -468,6 +478,36 @@ export default function PenjualanPage() {
       0
     );
   }, [filteredSales]);
+
+  /* =========================
+     DETAIL AKUN
+  ========================= */
+
+  const openDetail = (sale: Sale) => {
+    setDetailSale(sale);
+    setCopiedAccount(false);
+  };
+
+  const closeDetail = () => {
+    setDetailSale(null);
+    setCopiedAccount(false);
+  };
+
+  const copyAccount = async () => {
+    if (!detailSale?.account_details) return;
+
+    try {
+      await navigator.clipboard.writeText(detailSale.account_details);
+      setCopiedAccount(true);
+
+      setTimeout(() => {
+        setCopiedAccount(false);
+      }, 2000);
+    } catch (error) {
+      console.error(error);
+      alert("Gagal menyalin detail akun.");
+    }
+  };
 
   /* =========================
      CSV
@@ -493,6 +533,7 @@ export default function PenjualanPage() {
       "Payment",
       "Status",
       "Catatan",
+      "Detail Akun",
     ];
 
     const rows = filteredSales.map((sale) => [
@@ -509,15 +550,15 @@ export default function PenjualanPage() {
       sale.payment_method || "",
       sale.order_status || "",
       sale.notes || "",
+      sale.account_details || "",
     ]);
 
-    const csv = [
-      headers,
-      ...rows,
-    ]
+    const csv = [headers, ...rows]
       .map((row) =>
         row
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .map((value) =>
+            `"${String(value).replace(/"/g, '""')}"`
+          )
           .join(",")
       )
       .join("\n");
@@ -577,6 +618,7 @@ export default function PenjualanPage() {
       payment_method: sale.payment_method || "QRIS",
       order_status: sale.order_status || "Completed",
       notes: sale.notes || "",
+      account_details: sale.account_details || "",
     });
 
     setShowForm(true);
@@ -607,7 +649,9 @@ export default function PenjualanPage() {
     }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     if (!form.buyer_name.trim()) {
@@ -664,6 +708,7 @@ export default function PenjualanPage() {
       payment_method: form.payment_method,
       order_status: form.order_status,
       notes: form.notes.trim() || null,
+      account_details: form.account_details.trim() || null,
     };
 
     if (editingId) {
@@ -708,11 +753,12 @@ export default function PenjualanPage() {
 
     if (!confirmDelete) return;
 
-    const { data: warranties, error: warrantyError } = await supabase
-      .from("warranties")
-      .select("id")
-      .eq("sale_id", sale.id)
-      .limit(1);
+    const { data: warranties, error: warrantyError } =
+      await supabase
+        .from("warranties")
+        .select("id")
+        .eq("sale_id", sale.id)
+        .limit(1);
 
     if (warrantyError) {
       console.error(warrantyError);
@@ -830,7 +876,7 @@ export default function PenjualanPage() {
 
             <input
               type="text"
-              placeholder="Cari buyer, aplikasi, FH, paket..."
+              placeholder="Cari buyer, akun, aplikasi, FH, paket..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
@@ -926,10 +972,6 @@ export default function PenjualanPage() {
                     </th>
 
                     <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
-                      FH
-                    </th>
-
-                    <th className="px-3 py-3 text-[11px] font-medium text-gray-400">
                       Paket
                     </th>
 
@@ -974,25 +1016,41 @@ export default function PenjualanPage() {
                         {sale.order_date}
                       </td>
 
+                      {/* BUYER + CATATAN */}
                       <td
-                        className="max-w-[160px] truncate px-3 py-3 font-medium text-gray-700"
+                        className="max-w-[160px] px-3 py-3"
                         title={sale.buyer_name}
                       >
-                        {sale.buyer_name}
+                        <div className="max-w-[160px]">
+                          <div className="truncate font-medium text-gray-700">
+                            {sale.buyer_name}
+                          </div>
+
+                          {sale.notes && (
+                            <div
+                              className="mt-0.5 truncate text-[9px] text-gray-400"
+                              title={sale.notes}
+                            >
+                              {sale.notes}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
+                      {/* APP + FH */}
                       <td
-                        className="max-w-[130px] truncate px-3 py-3 text-gray-600"
+                        className="max-w-[130px] px-3 py-3"
                         title={sale.app_name}
                       >
-                        {sale.app_name}
-                      </td>
+                        <div className="max-w-[130px]">
+                          <div className="truncate text-gray-600">
+                            {sale.app_name}
+                          </div>
 
-                      <td
-                        className="max-w-[100px] truncate px-3 py-3 text-gray-500"
-                        title={sale.fh || "-"}
-                      >
-                        {sale.fh || "-"}
+                          <div className="truncate text-[9px] text-gray-400">
+                            FH: {sale.fh || "-"}
+                          </div>
+                        </div>
                       </td>
 
                       <td
@@ -1032,9 +1090,17 @@ export default function PenjualanPage() {
                         </span>
                       </td>
 
+                      {/* STICKY AKSI */}
                       <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-4 py-3 shadow-[-4px_0_8px_-6px_rgba(0,0,0,0.15)]">
 
                         <div className="flex gap-1.5">
+
+                          <button
+                            onClick={() => openDetail(sale)}
+                            className="rounded-lg bg-pink-50 px-2.5 py-1.5 text-[10px] font-medium text-pink-500 hover:bg-pink-100"
+                          >
+                            Detail
+                          </button>
 
                           <button
                             onClick={() => openEditForm(sale)}
@@ -1416,15 +1482,15 @@ export default function PenjualanPage() {
 
               </div>
 
-              {/* Notes */}
+              {/* Catatan Buyer */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-500">
-                  Catatan
+                  Catatan Buyer
                 </label>
 
                 <textarea
                   rows={3}
-                  placeholder="Catatan tambahan..."
+                  placeholder="Contoh: minta dikirim malam, jangan lupa follow up..."
                   value={form.notes}
                   onChange={(e) =>
                     setForm((prev) => ({
@@ -1434,6 +1500,43 @@ export default function PenjualanPage() {
                   }
                   className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
                 />
+              </div>
+
+              {/* Detail Akun */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium text-gray-500">
+                    Detail Akun
+                  </label>
+
+                  <span className="text-[10px] text-gray-300">
+                    bebas ditulis / tinggal copas
+                  </span>
+                </div>
+
+                <textarea
+                  rows={7}
+                  placeholder={`Contoh:
+
+email: example@gmail.com
+pass: 123456
+profile: 2
+pin: 1234
+
+jangan ubah password`}
+                  value={form.account_details}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      account_details: e.target.value,
+                    }))
+                  }
+                  className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
+                />
+
+                <p className="mt-1.5 text-[10px] text-gray-400">
+                  Semua isi di sini akan bisa dicari lewat kolom search.
+                </p>
               </div>
 
               {/* Buttons */}
@@ -1462,6 +1565,87 @@ export default function PenjualanPage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================
+          DETAIL AKUN MODAL
+      ========================= */}
+
+      {detailSale && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between border-b border-pink-100 px-6 py-5">
+
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">
+                  Detail Akun
+                </h2>
+
+                <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+                  <span>{detailSale.app_name}</span>
+                  <span>•</span>
+                  <span>{detailSale.fh || "-"}</span>
+                </div>
+
+                <p className="mt-0.5 text-xs text-gray-400">
+                  Buyer: {detailSale.buyer_name}
+                </p>
+              </div>
+
+              <button
+                onClick={closeDetail}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+
+            </div>
+
+            <div className="p-6">
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+
+                {detailSale.account_details ? (
+                  <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap break-words font-sans text-sm leading-6 text-gray-600">
+                    {detailSale.account_details}
+                  </pre>
+                ) : (
+                  <p className="py-8 text-center text-xs text-gray-400">
+                    Belum ada detail akun.
+                  </p>
+                )}
+
+              </div>
+
+              <div className="mt-4 flex gap-3">
+
+                <button
+                  type="button"
+                  onClick={copyAccount}
+                  disabled={!detailSale.account_details}
+                  className="flex-1 rounded-xl bg-pink-500 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {copiedAccount ? "✓ Berhasil Dicopy" : "Copy Akun"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeDetail();
+                    openEditForm(detailSale);
+                  }}
+                  className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+
+              </div>
+
+            </div>
           </div>
         </div>
       )}
@@ -1516,7 +1700,7 @@ export default function PenjualanPage() {
                   className="rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50"
                 >
                   {selectedMasterIds.length ===
-                  getMasterList().length &&
+                    getMasterList().length &&
                   getMasterList().length > 0
                     ? "Batal Pilih"
                     : "Pilih Semua"}
