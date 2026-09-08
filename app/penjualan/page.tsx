@@ -78,7 +78,10 @@ export default function PenjualanPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Semua");
-  const [dateFilter, setDateFilter] = useState("");
+
+  // FILTER TANGGAL
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -320,11 +323,25 @@ export default function PenjualanPage() {
       const matchesStatus =
         statusFilter === "Semua" || sale.order_status === statusFilter;
 
-      const matchesDate = !dateFilter || sale.order_date === dateFilter;
+      const matchesStartDate =
+        !startDate || sale.order_date >= startDate;
 
-      return matchesSearch && matchesStatus && matchesDate;
+      const matchesEndDate =
+        !endDate || sale.order_date <= endDate;
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesStartDate &&
+        matchesEndDate
+      );
     });
-  }, [sales, search, statusFilter, dateFilter]);
+  }, [sales, search, statusFilter, startDate, endDate]);
+
+  const clearDateFilter = () => {
+    setStartDate("");
+    setEndDate("");
+  };
 
   // =========================
   // SUMMARY
@@ -333,7 +350,8 @@ export default function PenjualanPage() {
   const totalOrder = filteredSales.length;
 
   const totalOmzet = filteredSales.reduce(
-    (total, sale) => total + Number(sale.selling_price || 0) * sale.quantity,
+    (total, sale) =>
+      total + Number(sale.selling_price || 0) * Number(sale.quantity || 1),
     0
   );
 
@@ -404,6 +422,7 @@ export default function PenjualanPage() {
     const link = document.createElement("a");
 
     link.href = url;
+
     link.download = `rekapan-penjualan-${new Date()
       .toISOString()
       .split("T")[0]}.csv`;
@@ -623,6 +642,32 @@ export default function PenjualanPage() {
       (Number(form.purchase_price) || 0)) *
     (Number(form.quantity) || 1);
 
+  // =========================
+  // STATUS STYLE
+  // =========================
+
+  const getStatusClass = (status: string | null) => {
+    switch (status) {
+      case "Completed":
+        return "bg-green-50 text-green-500";
+
+      case "On Going":
+        return "bg-blue-50 text-blue-500";
+
+      case "Pending":
+        return "bg-yellow-50 text-yellow-500";
+
+      case "Cancelled":
+        return "bg-red-50 text-red-500";
+
+      case "Refunded":
+        return "bg-purple-50 text-purple-500";
+
+      default:
+        return "bg-gray-50 text-gray-500";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fffafd]">
       {/* HEADER */}
@@ -667,7 +712,9 @@ export default function PenjualanPage() {
           </div>
 
           <div className="rounded-2xl border border-pink-100 bg-white p-3 sm:p-4">
-            <p className="text-[9px] text-gray-400 sm:text-[11px]">Omzet</p>
+            <p className="text-[9px] text-gray-400 sm:text-[11px]">
+              Omzet
+            </p>
 
             <p className="mt-1 truncate text-[12px] font-semibold text-gray-800 sm:text-xl">
               {formatRupiah(totalOmzet)}
@@ -675,7 +722,9 @@ export default function PenjualanPage() {
           </div>
 
           <div className="rounded-2xl border border-pink-100 bg-white p-3 sm:p-4">
-            <p className="text-[9px] text-gray-400 sm:text-[11px]">Profit</p>
+            <p className="text-[9px] text-gray-400 sm:text-[11px]">
+              Profit
+            </p>
 
             <p className="mt-1 truncate text-[12px] font-semibold text-pink-500 sm:text-xl">
               {formatRupiah(totalProfit)}
@@ -685,7 +734,8 @@ export default function PenjualanPage() {
 
         {/* FILTER */}
         <div className="mt-4 rounded-2xl border border-pink-100 bg-white p-3 sm:mt-5 sm:p-4">
-          <div className="flex flex-col gap-2.5 sm:gap-3 lg:flex-row">
+          <div className="flex flex-col gap-2.5 sm:gap-3 lg:flex-row lg:items-center">
+            {/* SEARCH */}
             <div className="flex-1">
               <input
                 type="text"
@@ -696,26 +746,62 @@ export default function PenjualanPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-3">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300 sm:px-4"
-              >
-                <option value="Semua">Semua Status</option>
-                <option value="Completed">Completed</option>
-                <option value="Pending">Pending</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
+            {/* STATUS */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300 sm:px-4 lg:w-[155px]"
+            >
+              <option value="Semua">Semua Status</option>
+              <option value="Completed">Completed</option>
+              <option value="On Going">On Going</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Refunded">Refunded</option>
+            </select>
 
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-600 outline-none focus:border-pink-300 sm:px-4"
-              />
+            {/* DATE RANGE */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2.5">
+              <div className="min-w-0">
+                <label className="mb-1 block text-[9px] font-medium text-gray-400 sm:text-[10px]">
+                  Dari Tanggal
+                </label>
+
+                <input
+                  type="date"
+                  value={startDate}
+                  max={endDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2.5 text-[10px] text-gray-600 outline-none focus:border-pink-300 sm:px-3 sm:text-xs"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <label className="mb-1 block text-[9px] font-medium text-gray-400 sm:text-[10px]">
+                  Sampai Tanggal
+                </label>
+
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2.5 text-[10px] text-gray-600 outline-none focus:border-pink-300 sm:px-3 sm:text-xs"
+                />
+              </div>
             </div>
 
+            {/* RESET DATE */}
+            {(startDate || endDate) && (
+              <button
+                onClick={clearDateFilter}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[10px] font-medium text-gray-500 transition hover:bg-gray-50 sm:w-auto sm:text-xs"
+              >
+                Reset
+              </button>
+            )}
+
+            {/* EXPORT */}
             <button
               onClick={exportCSV}
               className="w-full rounded-xl border border-pink-200 bg-pink-50 px-4 py-2.5 text-xs font-medium text-pink-500 transition hover:bg-pink-100 sm:w-auto"
@@ -867,13 +953,9 @@ export default function PenjualanPage() {
                       {/* STATUS */}
                       <td className="px-2.5 py-3 align-top sm:px-3">
                         <span
-                          className={`inline-flex rounded-full px-2 py-1 text-[9px] font-medium sm:px-2.5 sm:text-[10px] ${
-                            sale.order_status === "Completed"
-                              ? "bg-green-50 text-green-500"
-                              : sale.order_status === "Pending"
-                              ? "bg-yellow-50 text-yellow-500"
-                              : "bg-red-50 text-red-500"
-                          }`}
+                          className={`inline-flex rounded-full px-2 py-1 text-[9px] font-medium sm:px-2.5 sm:text-[10px] ${getStatusClass(
+                            sale.order_status
+                          )}`}
                         >
                           {sale.order_status || "-"}
                         </span>
@@ -1270,8 +1352,10 @@ pin: 1234`}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-700 outline-none focus:border-pink-300 focus:bg-white"
                   >
                     <option value="Completed">Completed</option>
+                    <option value="On Going">On Going</option>
                     <option value="Pending">Pending</option>
                     <option value="Cancelled">Cancelled</option>
+                    <option value="Refunded">Refunded</option>
                   </select>
                 </div>
               </div>

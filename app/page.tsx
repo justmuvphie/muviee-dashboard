@@ -20,12 +20,35 @@ type Warranty = {
   warranty_status: string;
 };
 
+const months = [
+  { value: "0", label: "Januari" },
+  { value: "1", label: "Februari" },
+  { value: "2", label: "Maret" },
+  { value: "3", label: "April" },
+  { value: "4", label: "Mei" },
+  { value: "5", label: "Juni" },
+  { value: "6", label: "Juli" },
+  { value: "7", label: "Agustus" },
+  { value: "8", label: "September" },
+  { value: "9", label: "Oktober" },
+  { value: "10", label: "November" },
+  { value: "11", label: "Desember" },
+];
+
 export default function Dashboard() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [period, setPeriod] = useState("month");
+  const now = new Date();
+
+  const [selectedMonth, setSelectedMonth] = useState(
+    String(now.getMonth())
+  );
+
+  const [selectedYear, setSelectedYear] = useState(
+    String(now.getFullYear())
+  );
 
   const loadData = async () => {
     setLoading(true);
@@ -63,38 +86,44 @@ export default function Dashboard() {
   }, [sales]);
 
   const filteredSales = useMemo(() => {
-    const now = new Date();
+    const month = Number(selectedMonth);
+    const year = Number(selectedYear);
 
     return activeSales.filter((sale) => {
-      const date = new Date(sale.order_date);
+      const date = new Date(`${sale.order_date}T00:00:00`);
 
-      if (period === "today") {
-        return (
-          date.getDate() === now.getDate() &&
-          date.getMonth() === now.getMonth() &&
-          date.getFullYear() === now.getFullYear()
-        );
-      }
-
-      if (period === "week") {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(now.getDate() - 6);
-        return date >= sevenDaysAgo;
-      }
-
-      if (period === "month") {
-        return (
-          date.getMonth() === now.getMonth() &&
-          date.getFullYear() === now.getFullYear()
-        );
-      }
-
-      return true;
+      return (
+        date.getMonth() === month &&
+        date.getFullYear() === year
+      );
     });
-  }, [activeSales, period]);
+  }, [activeSales, selectedMonth, selectedYear]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+
+    years.add(now.getFullYear());
+
+    sales.forEach((sale) => {
+      if (sale.order_date) {
+        const year = new Date(
+          `${sale.order_date}T00:00:00`
+        ).getFullYear();
+
+        if (!Number.isNaN(year)) {
+          years.add(year);
+        }
+      }
+    });
+
+    return Array.from(years).sort((a, b) => b - a);
+  }, [sales]);
 
   const totalOmzet = filteredSales.reduce(
-    (sum, sale) => sum + Number(sale.selling_price || 0) * Number(sale.quantity || 1),
+    (sum, sale) =>
+      sum +
+      Number(sale.selling_price || 0) *
+        Number(sale.quantity || 1),
     0
   );
 
@@ -128,10 +157,17 @@ export default function Dashboard() {
         };
       }
 
-      map[sale.app_name].orders += Number(sale.quantity || 1);
+      map[sale.app_name].orders += Number(
+        sale.quantity || 1
+      );
+
       map[sale.app_name].omzet +=
-        Number(sale.selling_price || 0) * Number(sale.quantity || 1);
-      map[sale.app_name].profit += Number(sale.profit || 0);
+        Number(sale.selling_price || 0) *
+        Number(sale.quantity || 1);
+
+      map[sale.app_name].profit += Number(
+        sale.profit || 0
+      );
     });
 
     return Object.entries(map)
@@ -144,7 +180,10 @@ export default function Dashboard() {
 
   const topApps = appStats.slice(0, 5);
 
-  const maxOmzet = Math.max(...topApps.map((item) => item.omzet), 1);
+  const maxOmzet = Math.max(
+    ...topApps.map((item) => item.omzet),
+    1
+  );
 
   const recentOrders = activeSales.slice(0, 7);
 
@@ -157,28 +196,54 @@ export default function Dashboard() {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(`${date}T00:00:00`).toLocaleDateString(
+      "id-ID",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   };
 
-  const periodLabel =
-    period === "today"
-      ? "Hari Ini"
-      : period === "week"
-      ? "7 Hari Terakhir"
-      : period === "month"
-      ? "Bulan Ini"
-      : "Semua";
+  const selectedMonthLabel =
+    months.find(
+      (month) => month.value === selectedMonth
+    )?.label || "";
+
+  const periodLabel = `${selectedMonthLabel} ${selectedYear}`;
+
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case "Completed":
+        return "bg-green-50 text-green-500";
+
+      case "On Going":
+        return "bg-blue-50 text-blue-500";
+
+      case "Pending":
+        return "bg-yellow-50 text-yellow-600";
+
+      case "Cancelled":
+        return "bg-red-50 text-red-500";
+
+      case "Refunded":
+        return "bg-purple-50 text-purple-600";
+
+      default:
+        return "bg-gray-50 text-gray-500";
+    }
+  };
 
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-pink-100 border-t-pink-500" />
-          <p className="text-sm text-gray-400">Loading dashboard...</p>
+
+          <p className="text-sm text-gray-400">
+            Loading dashboard...
+          </p>
         </div>
       </div>
     );
@@ -186,8 +251,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+
         <div>
           <p className="text-sm font-medium text-pink-400">
             welcome back ♡
@@ -202,39 +269,65 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          className="rounded-2xl border border-pink-100 bg-white px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-pink-400"
-        >
-          <option value="today">Hari Ini</option>
-          <option value="week">7 Hari Terakhir</option>
-          <option value="month">Bulan Ini</option>
-          <option value="all">Semua Data</option>
-        </select>
+        {/* Filter Bulan & Tahun */}
+        <div className="flex w-full gap-2 sm:w-auto">
+
+          <select
+            value={selectedMonth}
+            onChange={(e) =>
+              setSelectedMonth(e.target.value)
+            }
+            className="min-w-0 flex-1 rounded-2xl border border-pink-100 bg-white px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-pink-400 sm:w-[150px]"
+          >
+            {months.map((month) => (
+              <option
+                key={month.value}
+                value={month.value}
+              >
+                {month.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedYear}
+            onChange={(e) =>
+              setSelectedYear(e.target.value)
+            }
+            className="min-w-0 flex-1 rounded-2xl border border-pink-100 bg-white px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-pink-400 sm:w-[110px]"
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
         <StatCard
           icon="💰"
-          label={`Omzet ${periodLabel}`}
+          label="Total Omzet"
           value={formatRupiah(totalOmzet)}
-          description={`${totalOrder} order`}
+          description={periodLabel}
         />
 
         <StatCard
           icon="✨"
-          label={`Profit ${periodLabel}`}
+          label="Total Profit"
           value={formatRupiah(totalProfit)}
-          description="Keuntungan bersih"
+          description={periodLabel}
         />
 
         <StatCard
           icon="🛍️"
           label="Total Order"
           value={totalOrder.toString()}
-          description={`${periodLabel}`}
+          description={periodLabel}
         />
 
         <StatCard
@@ -243,19 +336,23 @@ export default function Dashboard() {
           value={activeWarranty.toString()}
           description="Perlu diperhatikan"
         />
+
       </div>
 
       {/* Main Grid */}
       <div className="grid gap-6 xl:grid-cols-3">
-        {/* Chart */}
+
+        {/* Penjualan per Aplikasi */}
         <div className="rounded-3xl border border-pink-100 bg-white p-6 shadow-sm xl:col-span-2">
+
           <div className="mb-6">
             <h2 className="font-bold text-gray-800">
               Penjualan per Aplikasi
             </h2>
 
             <p className="mt-1 text-sm text-gray-400">
-              Aplikasi dengan omzet terbesar.
+              Aplikasi dengan omzet terbesar pada{" "}
+              {periodLabel}.
             </p>
           </div>
 
@@ -263,15 +360,20 @@ export default function Dashboard() {
             <EmptyState text="Belum ada data penjualan." />
           ) : (
             <div className="space-y-5">
+
               {topApps.map((app, index) => (
                 <div key={app.name}>
+
                   <div className="mb-2 flex items-center justify-between gap-3">
+
                     <div className="flex min-w-0 items-center gap-3">
+
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-xs font-bold text-pink-500">
                         {index + 1}
                       </div>
 
                       <div className="min-w-0">
+
                         <p className="truncate text-sm font-semibold text-gray-700">
                           {app.name}
                         </p>
@@ -279,30 +381,41 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-400">
                           {app.orders} order
                         </p>
+
                       </div>
+
                     </div>
 
                     <p className="shrink-0 text-sm font-bold text-pink-500">
                       {formatRupiah(app.omzet)}
                     </p>
+
                   </div>
 
                   <div className="h-3 overflow-hidden rounded-full bg-pink-50">
+
                     <div
                       className="h-full rounded-full bg-pink-400 transition-all"
                       style={{
-                        width: `${(app.omzet / maxOmzet) * 100}%`,
+                        width: `${
+                          (app.omzet / maxOmzet) * 100
+                        }%`,
                       }}
                     />
+
                   </div>
+
                 </div>
               ))}
+
             </div>
           )}
+
         </div>
 
         {/* Profit */}
         <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50 to-white p-6 shadow-sm">
+
           <p className="text-sm font-medium text-pink-400">
             profit overview
           </p>
@@ -312,71 +425,101 @@ export default function Dashboard() {
           </h2>
 
           <p className="mt-2 text-sm text-gray-500">
-            Total profit berdasarkan periode{" "}
+            Total profit untuk periode{" "}
             <span className="font-semibold text-pink-500">
-              {periodLabel.toLowerCase()}
+              {periodLabel}
             </span>
             .
           </p>
 
           <div className="mt-8 rounded-2xl bg-white p-4 shadow-sm">
+
             <p className="text-xs text-gray-400">
               Rata-rata profit / order
             </p>
 
             <p className="mt-1 text-xl font-bold text-gray-700">
               {formatRupiah(
-                totalOrder > 0 ? totalProfit / totalOrder : 0
+                totalOrder > 0
+                  ? totalProfit / totalOrder
+                  : 0
               )}
             </p>
+
           </div>
 
           <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+
             <p className="text-xs text-gray-400">
               Profit margin
             </p>
 
             <p className="mt-1 text-xl font-bold text-gray-700">
               {totalOmzet > 0
-                ? `${((totalProfit / totalOmzet) * 100).toFixed(1)}%`
+                ? `${(
+                    (totalProfit / totalOmzet) *
+                    100
+                  ).toFixed(1)}%`
                 : "0%"}
             </p>
+
           </div>
+
         </div>
       </div>
 
       {/* App Recap */}
       <div className="rounded-3xl border border-pink-100 bg-white p-6 shadow-sm">
+
         <div className="mb-5">
+
           <h2 className="font-bold text-gray-800">
             Rekap Aplikasi
           </h2>
 
           <p className="mt-1 text-sm text-gray-400">
-            Performa setiap aplikasi pada periode yang dipilih.
+            Performa setiap aplikasi pada {periodLabel}.
           </p>
+
         </div>
 
         {appStats.length === 0 ? (
           <EmptyState text="Belum ada data." />
         ) : (
           <div className="overflow-x-auto">
+
             <table className="w-full min-w-[650px]">
+
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                  <th className="pb-3">Aplikasi</th>
-                  <th className="pb-3">Order</th>
-                  <th className="pb-3">Omzet</th>
-                  <th className="pb-3">Profit</th>
+
+                  <th className="pb-3">
+                    Aplikasi
+                  </th>
+
+                  <th className="pb-3">
+                    Order
+                  </th>
+
+                  <th className="pb-3">
+                    Omzet
+                  </th>
+
+                  <th className="pb-3">
+                    Profit
+                  </th>
+
                 </tr>
               </thead>
 
               <tbody>
+
                 {appStats.map((app) => (
                   <tr
                     key={app.name}
                     className="border-b border-gray-50 last:border-0"
                   >
+
                     <td className="py-4 font-semibold text-gray-700">
                       {app.name}
                     </td>
@@ -392,25 +535,34 @@ export default function Dashboard() {
                     <td className="py-4 text-sm font-semibold text-green-500">
                       {formatRupiah(app.profit)}
                     </td>
+
                   </tr>
                 ))}
+
               </tbody>
+
             </table>
+
           </div>
         )}
+
       </div>
 
       {/* Recent Orders */}
       <div className="rounded-3xl border border-pink-100 bg-white p-6 shadow-sm">
+
         <div className="mb-5 flex items-center justify-between">
+
           <div>
+
             <h2 className="font-bold text-gray-800">
               Order Terbaru
             </h2>
 
             <p className="mt-1 text-sm text-gray-400">
-              Transaksi terakhir yang masuk.
+              7 transaksi terakhir yang masuk.
             </p>
+
           </div>
 
           <a
@@ -419,23 +571,28 @@ export default function Dashboard() {
           >
             Lihat Semua
           </a>
+
         </div>
 
         {recentOrders.length === 0 ? (
           <EmptyState text="Belum ada order." />
         ) : (
           <div className="space-y-3">
+
             {recentOrders.map((sale) => (
               <div
                 key={sale.id}
                 className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
+
                 <div className="flex min-w-0 items-center gap-3">
+
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-100">
                     🛍️
                   </div>
 
                   <div className="min-w-0">
+
                     <p className="truncate text-sm font-semibold text-gray-700">
                       {sale.buyer_name}
                     </p>
@@ -443,11 +600,15 @@ export default function Dashboard() {
                     <p className="truncate text-xs text-gray-400">
                       {sale.app_name} • {sale.package_name}
                     </p>
+
                   </div>
+
                 </div>
 
                 <div className="flex items-center justify-between gap-6 sm:justify-end">
+
                   <div className="text-left sm:text-right">
+
                     <p className="text-sm font-bold text-gray-700">
                       {formatRupiah(
                         Number(sale.selling_price || 0) *
@@ -458,17 +619,27 @@ export default function Dashboard() {
                     <p className="text-xs text-gray-400">
                       {formatDate(sale.order_date)}
                     </p>
+
                   </div>
 
-                  <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-500">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                      sale.order_status
+                    )}`}
+                  >
                     {sale.order_status}
                   </span>
+
                 </div>
+
               </div>
             ))}
+
           </div>
         )}
+
       </div>
+
     </div>
   );
 }
@@ -486,10 +657,13 @@ function StatCard({
 }) {
   return (
     <div className="rounded-3xl border border-pink-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+
       <div className="flex items-start justify-between">
+
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink-50 text-xl">
           {icon}
         </div>
+
       </div>
 
       <p className="mt-5 text-sm text-gray-400">
@@ -503,16 +677,23 @@ function StatCard({
       <p className="mt-1 text-xs text-gray-400">
         {description}
       </p>
+
     </div>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function EmptyState({
+  text,
+}: {
+  text: string;
+}) {
   return (
     <div className="flex min-h-32 items-center justify-center rounded-2xl bg-gray-50">
+
       <p className="text-sm text-gray-400">
         {text}
       </p>
+
     </div>
   );
 }

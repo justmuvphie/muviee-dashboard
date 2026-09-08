@@ -37,7 +37,10 @@ export default function GaransiPage() {
   const [form, setForm] = useState(emptyForm);
 
   const [showForm, setShowForm] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedWarranty, setSelectedWarranty] =
+    useState<Warranty | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -74,7 +77,9 @@ export default function GaransiPage() {
 
   async function loadData() {
     setLoading(true);
+
     await Promise.all([getWarranties(), getSales()]);
+
     setLoading(false);
   }
 
@@ -83,14 +88,17 @@ export default function GaransiPage() {
   }, []);
 
   const filteredWarranties = useMemo(() => {
-    return warranties.filter((warranty) => {
-      const keyword = search.toLowerCase();
+    const keyword = search.toLowerCase().trim();
 
+    return warranties.filter((warranty) => {
       const matchesSearch =
+        !keyword ||
         warranty.buyer_name?.toLowerCase().includes(keyword) ||
         warranty.app_name?.toLowerCase().includes(keyword) ||
         warranty.package_name?.toLowerCase().includes(keyword) ||
-        warranty.claim_reason?.toLowerCase().includes(keyword);
+        warranty.claim_reason?.toLowerCase().includes(keyword) ||
+        warranty.notes?.toLowerCase().includes(keyword) ||
+        String(warranty.sale_id).includes(keyword);
 
       const matchesStatus =
         statusFilter === "All" ||
@@ -114,7 +122,15 @@ export default function GaransiPage() {
 
   function openAddForm() {
     setEditingId(null);
-    setForm(emptyForm);
+
+    setForm({
+      sale_id: "",
+      warranty_status: "Active",
+      claim_date: new Date().toISOString().split("T")[0],
+      claim_reason: "",
+      notes: "",
+    });
+
     setShowForm(true);
   }
 
@@ -134,10 +150,27 @@ export default function GaransiPage() {
     setShowForm(true);
   }
 
+  function openDetail(warranty: Warranty) {
+    setSelectedWarranty(warranty);
+    setShowDetail(true);
+  }
+
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
-    setForm(emptyForm);
+
+    setForm({
+      sale_id: "",
+      warranty_status: "Active",
+      claim_date: new Date().toISOString().split("T")[0],
+      claim_reason: "",
+      notes: "",
+    });
+  }
+
+  function closeDetail() {
+    setShowDetail(false);
+    setSelectedWarranty(null);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -225,11 +258,35 @@ export default function GaransiPage() {
     await getWarranties();
   }
 
+  function getStatusClass(status: string) {
+    switch (status) {
+      case "Active":
+        return "bg-green-50 text-green-600";
+
+      case "Pending":
+        return "bg-yellow-50 text-yellow-600";
+
+      case "Resolved":
+        return "bg-blue-50 text-blue-600";
+
+      case "Rejected":
+        return "bg-red-50 text-red-500";
+
+      default:
+        return "bg-gray-50 text-gray-500";
+    }
+  }
+
+  const selectedSale = sales.find(
+    (sale) => sale.id === Number(form.sale_id)
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-pink-200 border-t-pink-500" />
+
           <p className="text-sm text-gray-400">
             Loading garansi...
           </p>
@@ -258,7 +315,7 @@ export default function GaransiPage() {
 
         <button
           onClick={openAddForm}
-          className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-pink-600"
+          className="rounded-xl bg-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-pink-600"
         >
           + Tambah Garansi
         </button>
@@ -270,53 +327,77 @@ export default function GaransiPage() {
           <p className="text-xs text-gray-400">
             Total Garansi
           </p>
+
           <p className="mt-2 text-2xl font-bold text-gray-800">
             {warranties.length}
           </p>
         </div>
 
         <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">Active</p>
+          <p className="text-xs text-gray-400">
+            Active
+          </p>
+
           <p className="mt-2 text-2xl font-bold text-green-600">
             {activeCount}
           </p>
         </div>
 
         <div className="rounded-2xl border border-yellow-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">Pending</p>
+          <p className="text-xs text-gray-400">
+            Pending
+          </p>
+
           <p className="mt-2 text-2xl font-bold text-yellow-600">
             {pendingCount}
           </p>
         </div>
 
         <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-          <p className="text-xs text-gray-400">Resolved</p>
+          <p className="text-xs text-gray-400">
+            Resolved
+          </p>
+
           <p className="mt-2 text-2xl font-bold text-blue-600">
             {resolvedCount}
           </p>
         </div>
       </div>
 
-      {/* SEARCH */}
+      {/* SEARCH & FILTER */}
       <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-pink-100 bg-white p-4 shadow-sm md:flex-row">
         <input
           type="text"
-          placeholder="Cari buyer, aplikasi, paket..."
+          placeholder="Cari buyer, aplikasi, paket, alasan..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
+          className="min-w-0 flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-pink-400"
         />
 
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
+          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-pink-400"
         >
-          <option value="All">Semua Status</option>
-          <option value="Active">Active</option>
-          <option value="Pending">Pending</option>
-          <option value="Resolved">Resolved</option>
-          <option value="Rejected">Rejected</option>
+          <option value="All">
+            Semua Status
+          </option>
+
+          <option value="Active">
+            Active
+          </option>
+
+          <option value="Pending">
+            Pending
+          </option>
+
+          <option value="Resolved">
+            Resolved
+          </option>
+
+          <option value="Rejected">
+            Rejected
+          </option>
         </select>
       </div>
 
@@ -334,7 +415,9 @@ export default function GaransiPage() {
 
         {filteredWarranties.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <div className="text-4xl">🛡️</div>
+            <div className="text-4xl">
+              🛡️
+            </div>
 
             <p className="mt-3 font-medium text-gray-600">
               Belum ada data garansi
@@ -419,15 +502,9 @@ export default function GaransiPage() {
 
                     <td className="px-4 py-4">
                       <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-medium ${
-                          warranty.warranty_status === "Active"
-                            ? "bg-green-50 text-green-600"
-                            : warranty.warranty_status === "Pending"
-                            ? "bg-yellow-50 text-yellow-600"
-                            : warranty.warranty_status === "Resolved"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-red-50 text-red-500"
-                        }`}
+                        className={`rounded-full px-3 py-1 text-[10px] font-medium ${getStatusClass(
+                          warranty.warranty_status
+                        )}`}
                       >
                         {warranty.warranty_status}
                       </span>
@@ -435,6 +512,13 @@ export default function GaransiPage() {
 
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => openDetail(warranty)}
+                          className="rounded-lg bg-pink-50 px-3 py-2 text-xs font-medium text-pink-500 hover:bg-pink-100"
+                        >
+                          Detail
+                        </button>
+
                         <button
                           onClick={() => openEditForm(warranty)}
                           className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-500 hover:bg-blue-100"
@@ -458,7 +542,122 @@ export default function GaransiPage() {
         )}
       </div>
 
-      {/* FORM */}
+      {/* DETAIL MODAL */}
+      {showDetail && selectedWarranty && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-pink-100 bg-white px-6 py-5">
+              <div>
+                <h2 className="font-semibold text-gray-800">
+                  Detail Garansi
+                </h2>
+
+                <p className="mt-1 text-xs text-gray-400">
+                  Order #{selectedWarranty.sale_id}
+                </p>
+              </div>
+
+              <button
+                onClick={closeDetail}
+                className="rounded-lg px-3 py-2 text-gray-400 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-gray-50 p-4">
+                  <p className="text-[11px] text-gray-400">
+                    Buyer
+                  </p>
+
+                  <p className="mt-1 font-medium text-gray-700">
+                    {selectedWarranty.buyer_name}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-gray-50 p-4">
+                  <p className="text-[11px] text-gray-400">
+                    Aplikasi
+                  </p>
+
+                  <p className="mt-1 font-medium text-gray-700">
+                    {selectedWarranty.app_name}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-gray-50 p-4">
+                  <p className="text-[11px] text-gray-400">
+                    Paket
+                  </p>
+
+                  <p className="mt-1 font-medium text-gray-700">
+                    {selectedWarranty.package_name}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-gray-50 p-4">
+                  <p className="text-[11px] text-gray-400">
+                    Claim Date
+                  </p>
+
+                  <p className="mt-1 font-medium text-gray-700">
+                    {selectedWarranty.claim_date
+                      ? new Date(
+                          `${selectedWarranty.claim_date}T00:00:00`
+                        ).toLocaleDateString("id-ID")
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-500">
+                  Status Garansi
+                </p>
+
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
+                    selectedWarranty.warranty_status
+                  )}`}
+                >
+                  {selectedWarranty.warranty_status}
+                </span>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-500">
+                  Alasan Claim
+                </p>
+
+                <div className="whitespace-pre-wrap rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm leading-6 text-gray-600">
+                  {selectedWarranty.claim_reason || "-"}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-500">
+                  Catatan
+                </p>
+
+                <div className="whitespace-pre-wrap rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm leading-6 text-gray-600">
+                  {selectedWarranty.notes || "-"}
+                </div>
+              </div>
+
+              <button
+                onClick={closeDetail}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-500 hover:bg-gray-50"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FORM MODAL */}
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-xl">
@@ -483,7 +682,11 @@ export default function GaransiPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 p-6">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 p-6"
+            >
+              {/* ORDER */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Pilih Order
@@ -520,6 +723,48 @@ export default function GaransiPage() {
                 )}
               </div>
 
+              {/* SELECTED ORDER PREVIEW */}
+              {selectedSale && (
+                <div className="rounded-2xl border border-pink-100 bg-pink-50/50 p-4">
+                  <p className="mb-3 text-xs font-medium text-pink-500">
+                    Order yang dipilih
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-[10px] text-gray-400">
+                        Buyer
+                      </p>
+
+                      <p className="mt-1 text-sm font-medium text-gray-700">
+                        {selectedSale.buyer_name}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-gray-400">
+                        Aplikasi
+                      </p>
+
+                      <p className="mt-1 text-sm font-medium text-gray-700">
+                        {selectedSale.app_name}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-gray-400">
+                        Paket
+                      </p>
+
+                      <p className="mt-1 text-sm font-medium text-gray-700">
+                        {selectedSale.package_name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STATUS + DATE */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -536,10 +781,21 @@ export default function GaransiPage() {
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
                   >
-                    <option>Active</option>
-                    <option>Pending</option>
-                    <option>Resolved</option>
-                    <option>Rejected</option>
+                    <option value="Active">
+                      Active
+                    </option>
+
+                    <option value="Pending">
+                      Pending
+                    </option>
+
+                    <option value="Resolved">
+                      Resolved
+                    </option>
+
+                    <option value="Rejected">
+                      Rejected
+                    </option>
                   </select>
                 </div>
 
@@ -562,6 +818,7 @@ export default function GaransiPage() {
                 </div>
               </div>
 
+              {/* CLAIM REASON */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Alasan Claim
@@ -576,11 +833,12 @@ export default function GaransiPage() {
                     })
                   }
                   placeholder="Contoh: akun tidak bisa login..."
-                  rows={3}
+                  rows={4}
                   className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
                 />
               </div>
 
+              {/* NOTES */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Catatan
@@ -595,12 +853,13 @@ export default function GaransiPage() {
                     })
                   }
                   placeholder="Catatan tambahan..."
-                  rows={3}
+                  rows={4}
                   className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
                 />
               </div>
 
-              <div className="flex gap-3">
+              {/* BUTTON */}
+              <div className="flex flex-col-reverse gap-3 sm:flex-row">
                 <button
                   type="button"
                   onClick={closeForm}
