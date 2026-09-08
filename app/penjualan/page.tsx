@@ -27,22 +27,6 @@ type Product = {
   selling_price: number;
 };
 
-const fallbackProducts = [
-  "Netflix",
-  "iQIYI",
-  "HBO Max",
-  "WeTV",
-  "Prime Video",
-  "CapCut",
-  "Zoom",
-  "Loklok",
-  "Viu",
-  "Canva",
-  "ChatGPT",
-  "Meitu",
-  "Grammarly",
-];
-
 function formatRupiah(value: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -76,7 +60,6 @@ export default function PenjualanPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // FILTER TANGGAL
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -108,7 +91,7 @@ export default function PenjualanPage() {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Gagal mengambil produk:", error.message);
+      alert("Gagal mengambil data produk: " + error.message);
       return;
     }
 
@@ -130,18 +113,6 @@ export default function PenjualanPage() {
     loadData();
   }, []);
 
-  const productOptions =
-    products.length > 0
-      ? products
-      : fallbackProducts.map((name, index) => ({
-          id: index,
-          name,
-          category: "",
-          purchase_price: 0,
-          selling_price: 0,
-        }));
-
-  // FILTER DATA
   const filteredSales = useMemo(() => {
     return sales.filter((sale) => {
       const keyword = search.toLowerCase();
@@ -190,7 +161,6 @@ export default function PenjualanPage() {
     0
   );
 
-  // EXPORT CSV
   function exportCSV() {
     if (filteredSales.length === 0) {
       alert("Tidak ada data yang bisa diexport.");
@@ -238,7 +208,6 @@ export default function PenjualanPage() {
         row
           .map((value) => {
             const text = String(value ?? "");
-
             return `"${text.replace(/"/g, '""')}"`;
           })
           .join(",")
@@ -258,9 +227,7 @@ export default function PenjualanPage() {
     const dateLabel =
       startDate || endDate
         ? `${startDate || "awal"}_sampai_${endDate || "sekarang"}`
-        : new Date()
-            .toISOString()
-            .split("T")[0];
+        : new Date().toISOString().split("T")[0];
 
     link.href = url;
     link.download = `rekapan_penjualan_${dateLabel}.csv`;
@@ -281,12 +248,14 @@ export default function PenjualanPage() {
 
   function openAddForm() {
     setEditingId(null);
+
     setForm({
       ...emptyForm,
       order_date: new Date()
         .toISOString()
         .split("T")[0],
     });
+
     setShowForm(true);
   }
 
@@ -323,6 +292,7 @@ export default function PenjualanPage() {
   function closeForm() {
     setShowForm(false);
     setEditingId(null);
+
     setForm({
       ...emptyForm,
       order_date: new Date()
@@ -423,16 +393,13 @@ export default function PenjualanPage() {
       order_date: form.order_date,
       buyer_name: form.buyer_name.trim(),
       app_name: form.app_name,
-      package_name:
-        form.package_name.trim(),
+      package_name: form.package_name.trim(),
       duration: form.duration.trim(),
       quantity,
       purchase_price: purchasePrice,
       selling_price: sellingPrice,
-      payment_method:
-        form.payment_method,
-      order_status:
-        form.order_status,
+      payment_method: form.payment_method,
+      order_status: form.order_status,
       notes: form.notes.trim(),
     };
 
@@ -618,19 +585,15 @@ export default function PenjualanPage() {
             <option value="All">
               Semua Status
             </option>
-
             <option value="Completed">
               Completed
             </option>
-
             <option value="Pending">
               Pending
             </option>
-
             <option value="Cancelled">
               Cancelled
             </option>
-
             <option value="Refunded">
               Refunded
             </option>
@@ -916,7 +879,7 @@ export default function PenjualanPage() {
               onSubmit={handleSubmit}
               className="space-y-5 p-6"
             >
-              {/* Tanggal + Buyer */}
+              {/* TANGGAL + BUYER */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -960,7 +923,7 @@ export default function PenjualanPage() {
                 </div>
               </div>
 
-              {/* App + Package */}
+              {/* APLIKASI + PAKET */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -981,10 +944,10 @@ export default function PenjualanPage() {
                       Pilih aplikasi
                     </option>
 
-                    {productOptions.map(
+                    {products.map(
                       (product) => (
                         <option
-                          key={`${product.id}-${product.name}`}
+                          key={product.id}
                           value={product.name}
                         >
                           {product.name}
@@ -1024,7 +987,7 @@ export default function PenjualanPage() {
                 </div>
               </div>
 
-              {/* Duration + Quantity */}
+              {/* DURASI + QUANTITY */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -1068,7 +1031,7 @@ export default function PenjualanPage() {
                 </div>
               </div>
 
-              {/* Prices */}
+              {/* HARGA */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -1102,8 +1065,7 @@ export default function PenjualanPage() {
                   {form.app_name &&
                     products.length > 0 && (
                       <p className="mt-1 text-[10px] text-gray-400">
-                        Bisa diubah manual untuk
-                        order tertentu.
+                        Bisa diubah manual.
                       </p>
                     )}
                 </div>
@@ -1140,14 +1102,13 @@ export default function PenjualanPage() {
                   {form.app_name &&
                     products.length > 0 && (
                       <p className="mt-1 text-[10px] text-gray-400">
-                        Bisa diubah manual untuk
-                        order tertentu.
+                        Bisa diubah manual.
                       </p>
                     )}
                 </div>
               </div>
 
-              {/* Payment + Status */}
+              {/* PAYMENT + STATUS */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
@@ -1198,15 +1159,12 @@ export default function PenjualanPage() {
                     <option>
                       Completed
                     </option>
-
                     <option>
                       Pending
                     </option>
-
                     <option>
                       Cancelled
                     </option>
-
                     <option>
                       Refunded
                     </option>
@@ -1214,7 +1172,7 @@ export default function PenjualanPage() {
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* CATATAN */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Catatan
@@ -1235,7 +1193,7 @@ export default function PenjualanPage() {
                 />
               </div>
 
-              {/* Profit Preview */}
+              {/* PROFIT */}
               {form.purchase_price !== "" &&
                 form.selling_price !== "" && (
                   <div className="rounded-xl bg-green-50 p-4">
@@ -1281,7 +1239,7 @@ export default function PenjualanPage() {
                   </div>
                 )}
 
-              {/* Buttons */}
+              {/* BUTTON */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
