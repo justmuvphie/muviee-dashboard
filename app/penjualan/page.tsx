@@ -8,6 +8,7 @@ type Sale = {
   order_date: string;
   buyer_name: string;
   app_name: string;
+  fh: string;
   package_name: string;
   duration: string;
   quantity: number;
@@ -27,6 +28,11 @@ type Product = {
   selling_price: number;
 };
 
+type MasterItem = {
+  id: number;
+  name: string;
+};
+
 function formatRupiah(value: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -39,6 +45,7 @@ const emptyForm = {
   order_date: new Date().toISOString().split("T")[0],
   buyer_name: "",
   app_name: "",
+  fh: "",
   package_name: "",
   duration: "",
   quantity: "1",
@@ -52,6 +59,10 @@ const emptyForm = {
 export default function PenjualanPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+
+  const [fhList, setFhList] = useState<MasterItem[]>([]);
+  const [packageList, setPackageList] = useState<MasterItem[]>([]);
+
   const [form, setForm] = useState(emptyForm);
 
   const [showForm, setShowForm] = useState(false);
@@ -74,7 +85,7 @@ export default function PenjualanPage() {
     const { data, error } = await supabase
       .from("sales")
       .select(
-        "id, order_date, buyer_name, app_name, package_name, duration, quantity, purchase_price, selling_price, profit, payment_method, order_status, notes"
+        "id, order_date, buyer_name, app_name, fh, package_name, duration, quantity, purchase_price, selling_price, profit, payment_method, order_status, notes"
       )
       .order("id", { ascending: false });
 
@@ -103,17 +114,6 @@ export default function PenjualanPage() {
       return;
     }
 
-    /*
-      Kita pakai Map berdasarkan nama produk.
-
-      Tujuannya:
-      - Tidak ada aplikasi duplikat di dropdown.
-      - Kalau ada data produk dengan nama sama,
-        harga yang tidak 0 akan diprioritaskan.
-      - Kalau modal dan jual berasal dari row berbeda,
-        keduanya akan digabung.
-    */
-
     const productMap = new Map<string, Product>();
 
     for (const item of data || []) {
@@ -123,13 +123,8 @@ export default function PenjualanPage() {
 
       const key = name.toLowerCase();
 
-      const purchasePrice = Number(
-        item.purchase_price ?? 0
-      );
-
-      const sellingPrice = Number(
-        item.selling_price ?? 0
-      );
+      const purchasePrice = Number(item.purchase_price ?? 0);
+      const sellingPrice = Number(item.selling_price ?? 0);
 
       const existing = productMap.get(key);
 
@@ -147,12 +142,10 @@ export default function PenjualanPage() {
 
       productMap.set(key, {
         ...existing,
-
         purchase_price:
           purchasePrice > 0
             ? purchasePrice
             : existing.purchase_price,
-
         selling_price:
           sellingPrice > 0
             ? sellingPrice
@@ -170,6 +163,42 @@ export default function PenjualanPage() {
   }
 
   // =========================
+  // AMBIL FH
+  // =========================
+
+  async function getFH() {
+    const { data, error } = await supabase
+      .from("fh_list")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (error) {
+      alert("Gagal mengambil daftar FH: " + error.message);
+      return;
+    }
+
+    setFhList((data || []) as MasterItem[]);
+  }
+
+  // =========================
+  // AMBIL PAKET
+  // =========================
+
+  async function getPackages() {
+    const { data, error } = await supabase
+      .from("package_list")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (error) {
+      alert("Gagal mengambil daftar paket: " + error.message);
+      return;
+    }
+
+    setPackageList((data || []) as MasterItem[]);
+  }
+
+  // =========================
   // LOAD DATA
   // =========================
 
@@ -179,6 +208,8 @@ export default function PenjualanPage() {
     await Promise.all([
       getSales(),
       getProducts(),
+      getFH(),
+      getPackages(),
     ]);
 
     setLoading(false);
@@ -187,6 +218,91 @@ export default function PenjualanPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // =========================
+  // TAMBAH FH
+  // =========================
+
+  async function addFH() {
+    const name = prompt("Masukkan nama FH baru:");
+
+    if (!name || !name.trim()) return;
+
+    const cleanName = name.trim();
+
+    const { data, error } = await supabase
+      .from("fh_list")
+      .insert([{ name: cleanName }])
+      .select("id, name")
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        alert("FH tersebut sudah ada.");
+      } else {
+        alert("Gagal menambahkan FH: " + error.message);
+      }
+
+      return;
+    }
+
+    if (data) {
+      setFhList((current) =>
+        [...current, data].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
+
+      setForm((current) => ({
+        ...current,
+        fh: data.name,
+      }));
+    }
+  }
+
+  // =========================
+  // TAMBAH PAKET
+  // =========================
+
+  async function addPackage() {
+    const name = prompt("Masukkan nama paket baru:");
+
+    if (!name || !name.trim()) return;
+
+    const cleanName = name.trim();
+
+    const { data, error } = await supabase
+      .from("package_list")
+      .insert([{ name: cleanName }])
+      .select("id, name")
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        alert("Nama paket tersebut sudah ada.");
+      } else {
+        alert(
+          "Gagal menambahkan paket: " +
+            error.message
+        );
+      }
+
+      return;
+    }
+
+    if (data) {
+      setPackageList((current) =>
+        [...current, data].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
+
+      setForm((current) => ({
+        ...current,
+        package_name: data.name,
+      }));
+    }
+  }
 
   // =========================
   // FILTER
@@ -201,6 +317,9 @@ export default function PenjualanPage() {
           ?.toLowerCase()
           .includes(keyword) ||
         sale.app_name
+          ?.toLowerCase()
+          .includes(keyword) ||
+        sale.fh
           ?.toLowerCase()
           .includes(keyword) ||
         sale.package_name
@@ -266,6 +385,7 @@ export default function PenjualanPage() {
       "Tanggal",
       "Buyer",
       "Aplikasi",
+      "FH",
       "Paket",
       "Durasi",
       "Qty",
@@ -282,6 +402,7 @@ export default function PenjualanPage() {
       sale.order_date || "",
       sale.buyer_name || "",
       sale.app_name || "",
+      sale.fh || "",
       sale.package_name || "",
       sale.duration || "",
       sale.quantity || 0,
@@ -382,6 +503,8 @@ export default function PenjualanPage() {
 
       app_name: sale.app_name || "",
 
+      fh: sale.fh || "",
+
       package_name:
         sale.package_name || "",
 
@@ -391,7 +514,6 @@ export default function PenjualanPage() {
         sale.quantity || 1
       ),
 
-      // Harga historis tetap dipakai
       purchase_price: String(
         sale.purchase_price ?? ""
       ),
@@ -458,14 +580,6 @@ export default function PenjualanPage() {
       return;
     }
 
-    /*
-      Saat aplikasi dipilih:
-
-      products -> data dari Supabase
-      purchase_price -> harga modal produk
-      selling_price -> harga jual produk
-    */
-
     setForm((current) => ({
       ...current,
 
@@ -504,8 +618,13 @@ export default function PenjualanPage() {
       return;
     }
 
-    if (!form.package_name.trim()) {
-      alert("Nama paket wajib diisi.");
+    if (!form.fh) {
+      alert("Pilih FH terlebih dahulu.");
+      return;
+    }
+
+    if (!form.package_name) {
+      alert("Pilih nama paket terlebih dahulu.");
       return;
     }
 
@@ -561,8 +680,10 @@ export default function PenjualanPage() {
 
       app_name: form.app_name,
 
+      fh: form.fh,
+
       package_name:
-        form.package_name.trim(),
+        form.package_name,
 
       duration:
         form.duration.trim(),
@@ -767,7 +888,7 @@ export default function PenjualanPage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <input
             type="text"
-            placeholder="Cari buyer, aplikasi, atau paket..."
+            placeholder="Cari buyer, aplikasi, FH, atau paket..."
             value={search}
             onChange={(e) =>
               setSearch(e.target.value)
@@ -788,6 +909,10 @@ export default function PenjualanPage() {
 
             <option value="Completed">
               Completed
+            </option>
+
+            <option value="On Going">
+              On Going
             </option>
 
             <option value="Pending">
@@ -883,7 +1008,7 @@ export default function PenjualanPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1200px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
                   <th className="px-6 py-4 text-xs text-gray-400">
@@ -896,6 +1021,10 @@ export default function PenjualanPage() {
 
                   <th className="px-4 py-4 text-xs text-gray-400">
                     Aplikasi
+                  </th>
+
+                  <th className="px-4 py-4 text-xs text-gray-400">
+                    FH
                   </th>
 
                   <th className="px-4 py-4 text-xs text-gray-400">
@@ -961,6 +1090,10 @@ export default function PenjualanPage() {
                         {sale.app_name}
                       </td>
 
+                      <td className="px-4 py-4 text-gray-600">
+                        {sale.fh || "-"}
+                      </td>
+
                       <td className="px-4 py-4">
                         <p className="text-gray-600">
                           {sale.package_name}
@@ -1008,6 +1141,9 @@ export default function PenjualanPage() {
                               : sale.order_status ===
                                 "Cancelled"
                               ? "bg-red-50 text-red-500"
+                              : sale.order_status ===
+                                "On Going"
+                              ? "bg-blue-50 text-blue-500"
                               : "bg-yellow-50 text-yellow-600"
                           }`}
                         >
@@ -1128,7 +1264,7 @@ export default function PenjualanPage() {
                 </div>
               </div>
 
-              {/* APLIKASI + PAKET */}
+              {/* APLIKASI + FH */}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -1176,31 +1312,105 @@ export default function PenjualanPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Nama Paket
+                    FH
                   </label>
 
-                  <input
-                    type="text"
-                    value={
-                      form.package_name
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        package_name:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="contoh: Private Standard"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={form.fh}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          fh: e.target.value,
+                        })
+                      }
+                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
+                      required
+                    >
+                      <option value="">
+                        Pilih FH
+                      </option>
+
+                      {fhList.map(
+                        (fh) => (
+                          <option
+                            key={fh.id}
+                            value={fh.name}
+                          >
+                            {fh.name}
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={addFH}
+                      className="rounded-xl bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-500 hover:bg-pink-100"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    FH baru bisa ditambahkan lewat tombol +
+                  </p>
                 </div>
               </div>
 
-              {/* DURASI + QTY */}
+              {/* PAKET + DURASI */}
 
               <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-600">
+                    Nama Paket
+                  </label>
+
+                  <div className="flex gap-2">
+                    <select
+                      value={
+                        form.package_name
+                      }
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          package_name:
+                            e.target.value,
+                        })
+                      }
+                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-pink-400"
+                      required
+                    >
+                      <option value="">
+                        Pilih nama paket
+                      </option>
+
+                      {packageList.map(
+                        (item) => (
+                          <option
+                            key={item.id}
+                            value={item.name}
+                          >
+                            {item.name}
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={addPackage}
+                      className="rounded-xl bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-500 hover:bg-pink-100"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    Paket baru bisa ditambahkan lewat tombol +
+                  </p>
+                </div>
+
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">
                     Durasi
@@ -1222,29 +1432,31 @@ export default function PenjualanPage() {
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">
-                    Quantity
-                  </label>
+              {/* QTY */}
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={
-                      form.quantity
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        quantity:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-600">
+                  Quantity
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={
+                    form.quantity
+                  }
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      quantity:
+                        e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-pink-400"
+                  required
+                />
               </div>
 
               {/* HARGA */}
@@ -1279,12 +1491,9 @@ export default function PenjualanPage() {
                     />
                   </div>
 
-                  {form.app_name &&
-                    products.length > 0 && (
-                      <p className="mt-1 text-[10px] text-gray-400">
-                        Bisa diubah manual.
-                      </p>
-                    )}
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    Bisa diubah manual.
+                  </p>
                 </div>
 
                 <div>
@@ -1316,12 +1525,9 @@ export default function PenjualanPage() {
                     />
                   </div>
 
-                  {form.app_name &&
-                    products.length > 0 && (
-                      <p className="mt-1 text-[10px] text-gray-400">
-                        Bisa diubah manual.
-                      </p>
-                    )}
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    Bisa diubah manual.
+                  </p>
                 </div>
               </div>
 
@@ -1427,6 +1633,10 @@ export default function PenjualanPage() {
                   >
                     <option>
                       Completed
+                    </option>
+
+                    <option>
+                      On Going
                     </option>
 
                     <option>
