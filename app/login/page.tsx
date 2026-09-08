@@ -26,22 +26,29 @@ export default function LoginPage() {
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-
+  
     setLoading(true);
     setError("");
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError("Email atau password salah.");
+  
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+  
+      if (error) {
+        console.error("LOGIN ERROR:", error);
+        setError(error.message);
+        return;
+      }
+  
+      router.replace("/");
+    } catch (err) {
+      console.error("LOGIN ERROR:", err);
+      setError("Terjadi kesalahan saat menghubungkan ke server.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.replace("/");
   };
 
   return (
